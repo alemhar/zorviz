@@ -1,0 +1,357 @@
+
+```markdown
+# Project Plan: Hybrid Repair Shop SaaS (Local-First + Cloud)
+
+## 1. Executive Summary
+
+**Goal:** Build a Hybrid SaaS that combines **Local-First reliability** for shop operations with **Cloud accessibility** for customers and owners.
+**Initial Prospect:** Car Aircon Repair Shop.
+**Scalability Strategy:** "Asset Agnostic" Core (Works for Auto, Gadgets, Appliances).
+**Core Value:** Zero-latency shop operations (even without internet) + Modern remote features (Booking, Owner Dashboard).
+
+## 2. Market Strategy: "Niche First, Expand Later"
+
+### Phase 1: The "Motorized" Niche (Current Focus)
+
+* **Target:** Car Aircon, General Talyer, Motorcycle Shops.
+
+* **Key Asset Data:** Plate Number, Odometer, Vehicle Make/Model.
+
+### Phase 2: The "Gadget" Expansion
+
+* **Target:** Computer/Phone Repair.
+
+* **Key Asset Data:** Serial Number, Password, Physical Condition.
+
+### Phase 3: Customer Engagement
+
+* **Target:** Booking, Loyalty Points, Service Reminders.
+
+## 3. Technical Architecture: Hybrid (Local-First + Cloud)
+
+We will use a **Sync-Based Architecture**. The "Truth" exists in both the Shop (Local DB) and the Cloud (Cloud DB), kept in sync via a replication engine.
+
+### 3.1 The "Shop Node" (Local-First)
+
+* **App:** **Tauri** (Desktop) for Admin/Advisor; **PWA** for Mechanics.
+
+* **Database:** **SQLite** (running locally on the Shop PC).
+
+* **Role:**
+
+  * Handles Intake, Estimating, and Job Management.
+
+  * **Crucial:** Works 100% offline. No spinner wheels waiting for the server.
+
+  * Acts as the Local LAN Server for Mechanics (Island Architecture).
+
+### 3.2 The "Cloud Node" (SaaS Core)
+
+* **App:** Web Frontend (Next.js/React).
+
+* **Database:** **Postgres** (Supabase/Neon).
+
+* **Role:**
+
+  * Handles Online Booking (Customer).
+
+  * Handles Sales Reports (Remote Owner).
+
+  * Serves the **Public QR Code** landing pages.
+
+### 3.3 The Sync Engine (The Bridge)
+
+* **Logic:**
+
+  * **Upstream:** When Advisor saves an Estimate locally -> Syncs to Cloud -> Cloud generates QR Link.
+
+  * **Downstream:** When Customer books online -> Syncs to Shop PC -> Appears on Schedule.
+
+* **Constraint:** If Shop Internet is down, the **Internet QR Code** will not work (Customer will see 404).
+
+  * *Fallback:* Use **OTP** or **Local Signing** if sync fails.
+
+### 3.4 Code Sharing Strategy (Monorepo)
+
+To ensure business logic is consistent between the **Node.js Cloud** and **Rust/Tauri Desktop**, we will use a **Monorepo** structure.
+
+* **`packages/core` (Shared Logic):**
+
+  * Contains pure TypeScript modules used by both environments.
+
+  * **Contents:**
+
+    * `types.ts`: Shared Interfaces for Assets, Orders, Users.
+
+    * `calculations.ts`: Tax logic, Total computation.
+
+    * `validation.ts`: Zod schemas for input validation (e.g., Plate # format).
+
+    * `schema.ts`: Drizzle ORM schema definition (Shared by SQLite and Postgres).
+
+### 3.5 Frontend Tooling Standards (Strict Context for AI)
+
+* **UI Framework:** React 18+
+
+* **Styling:** **Tailwind CSS** (Utility-first is mandatory for speed).
+
+* **Component Library:** **shadcn/ui** (Radix UI).
+
+  * *Why:* AI models write excellent shadcn code. It is copy-paste friendly and customizable.
+
+* **State Management:**
+
+  * **Tauri/Local:** `Zustand` (Simple, good for managing the offline sync queue).
+
+  * **Cloud/Web:** `TanStack Query` (React Query) (Best for caching server state).
+
+* **Routing:** File-system based routing (Next.js App Router for Cloud; React Router or TanStack Router for Tauri).
+
+### 3.6 Sync Protocol Specifications (Implementation Guide)
+
+* **Method:** REST API (Polling or Event Triggered). DO NOT use WebSockets for the MVP sync (too complex).
+
+* **Endpoints:**
+
+  * `POST /api/sync/push`: Shop sends array of changes `{ table: 'orders', data: row, timestamp: 123 }`.
+
+  * `GET /api/sync/pull?last_synced_at=123`: Shop asks for changes since last sync.
+
+* **Conflict Resolution:** Last Write Wins (based on `updated_at` column).
+
+### 3.7 Subscription & Licensing Strategy (The "Time Lock")
+
+To prevent unauthorized offline use after a subscription ends, the app implements a **Signed License File** strategy.
+
+* **The Mechanism:**
+
+  * The Tauri App contains a **Hard-Coded Public Key**.
+
+  * A `license.key` file is stored locally in the App Data folder.
+
+  * **Content:** JSON containing `{ "expiry": "2025-12-31", "tier": "PRO", "signature": "xyz..." }`.
+
+* **The Enforcement Logic (On Startup):**
+
+  1. **Verify:** App verifies the `signature` using the Public Key. (Prevents editing the file).
+
+  2. **Date Check:** If `Today > expiry`, switch to **Read-Only Mode** (Block new Jobs).
+
+  3. **Anti-Time-Travel:** The app stores a `last_opened_at` timestamp in an encrypted store. If `System Time < last_opened_at`, the user tampered with the clock -> **Block Access**.
+
+* **The Renewal Workflow:**
+
+  * **Trigger:** 30 days before expiry, show "Renew Now" banner.
+
+  * **Action:** User connects to Internet -> Clicks "Check for Renewal".
+
+  * **Server:** Validates payment -> Returns **New License File** (with next year's date).
+
+  * **App:** Overwrites local `license.key`. (No software update required).
+
+## 4. The Workflow: Where Data Lives
+
+### State 1: Booking & Intake
+
+* **Scenario A (Online Booking):**
+
+  * **Actor:** Customer (at home).
+
+  * **Data:** Writes to **Cloud DB**.
+
+  * **Sync:** Shop PC pulls booking when online.
+
+* **Scenario B (Walk-in Intake):**
+
+  * **Actor:** Advisor (in shop).
+
+  * **Data:** Writes to **Local DB** (SQLite) instantly.
+
+  * **Sync:** Pushes to Cloud background.
+
+### State 2: Approval (The "Hybrid" Trigger)
+
+* **Goal:** Legal confirmation.
+
+* **Default Route:** **Internet QR Code**.
+
+  * *Prerequisite:* Local Estimate must successfully sync to Cloud.
+
+  * *Customer Action:* Scans QR -> Visits `https://app.myshop.com/approve/{uuid}`.
+
+  * *Result:* Customer signs on their phone (Cloud DB). Shop PC pulls "Approved" status.
+
+* **Fallback Route (Offline):** **OTP / Local Tablet**.
+
+  * *Use Case:* Shop Internet is dead. Sync failed.
+
+  * *Action:* Customer signs directly on Shop Tablet/PC (Local DB).
+
+### State 3: Execution (The Job)
+
+* **Actor:** Mechanic.
+
+* **Device:** Mobile Phone connected to **Shop Wi-Fi**.
+
+* **Connectivity:** Connects to Shop PC IP (Local Server).
+
+* **Updates:** Marks tasks "Done" (Local DB). Pushes to Cloud when PC has internet.
+
+### State 4: Billing & Reporting
+
+* **Action:** Cashier generates Invoice (Local DB).
+
+* **Reporting:** Owner checks "Daily Sales" from home (Reads from Cloud DB).
+
+## 5. Database Schema: Designing for Scalability
+
+### Core Tables (Synced)
+
+1. **Users:** (Roles: Admin, Advisor, Mechanic, Customer)
+
+2. **Assets:** (The generic "Item" being fixed)
+
+   * `id`, `owner_id`, `type` (Vehicle/Laptop), `specs` (JSON for Odometer/Password).
+
+3. **Bookings:**
+
+   * `id`, `asset_id`, `service_id`, `scheduled_time`, `status`.
+
+4. **Orders (Jobs):**
+
+   * `id`, `booking_id` (optional), `status`, `approval_proof`.
+
+5. **Inventory:**
+
+   * `sku`, `stock_on_hand`, `reorder_point`.
+
+## 6. Key Features
+
+### A. Customer Booking & Portal (Cloud Only)
+
+* **Self-Service:** Customer registers, adds their car details once, and books appointments.
+
+### B. Remote Owner Dashboard (Cloud Only)
+
+* **Real-Time Stats:** "How many cars are in the bay right now?" (Dependent on Shop Sync status).
+
+* **Financials:** Daily Sales vs. Expenses.
+
+* **Audit:** Notification if a Job Order is deleted or discounted heavily.
+
+### C. The "Smart" Intake (Local First)
+
+* **Asset Logic:** Select "Car" -> Ask Odometer. Select "Phone" -> Ask Passcode.
+
+* **Performance:** Instant search of 10,000+ past records (Search runs on local SQLite).
+
+## 7. Next Steps
+
+1. **Architecture Setup:**
+
+   * Initialize **Monorepo** (TurboRepo or Nx).
+
+   * Create `packages/core` with the shared Drizzle Schema.
+
+   * Initialize **Tauri** project (Desktop) and **Next.js** project (Cloud).
+
+2. **Sync Prototype:**
+
+   * Build a simple "Ping-Pong" sync: Create a Customer Locally -> See it appear in Cloud DB.
+
+3. **Frontend MVP:**
+
+   * Build the **Local Intake Form** (Tauri).
+
+   * Build the **Public QR Page** (Cloud).
+
+## 8. Appendix: Monorepo Directory Structure
+
+
+```
+
+/my-saas-repo
+├── apps
+│   ├── cloud        # Next.js (Customer Portal + Owner Dashboard)
+│   └── desktop      # Tauri + React (Shop Admin + Mechanic Local Server)
+├── packages
+│   ├── core         # Shared Business Logic, Types, Zod Schemas
+│   ├── db           # Shared Drizzle Schema & Migrations
+│   └── ui           # Shared React Components (shadcn/ui)
+├── turbo.json       # Pipeline config
+└── package.json
+
+```
+
+## 9. Commercial Pricing Strategy
+
+We employ a "Hybrid" Pricing Model that charges for the Software License (One-Time) and the Connectivity (Recurring).
+
+### 9.1 One-Time License (Base Desktop): ₱35,000 + VAT
+
+* **Includes:**
+
+  * Lifetime use of the Offline Desktop App (Version Locked).
+
+  * On-site Installation & Setup.
+
+  * Initial Staff Training.
+
+  * 1 Year "Digital Lease" (Cloud Connectivity).
+
+* **Rationale:** Covers the high cost of deployment/sales and anchors the value as a premium "Asset" for the shop.
+
+### 9.2 Monthly Cloud Subscription: ₱1,500 - ₱2,500 / mo
+
+* **Starts:** After Year 1.
+
+* **Includes:**
+
+  * **Cloud Sync:** Data backup & mirroring.
+
+  * **Remote Dashboard:** Owner access from home.
+
+  * **Online Booking:** Customer portal access.
+
+  * **Software Updates:** Access to new features & bug patches.
+
+  * **License Renewal:** Digital Lease Key update.
+
+* **Rationale:** Covers server costs (Postgres/Hosting) and ongoing development.
+
+### 9.3 Optional Add-ons
+
+* **SMS Credits:** ₱0.50 per OTP (Sold in packs).
+
+* **Hardware Bundle:** ₱15,000 (Includes Thermal Printer + Cheap Android Tablet).
+
+### 9.4 Technical Support Strategy (Pay-Per-Incident)
+
+To minimize costs for the client while protecting our time, we prioritize remote resolution before deploying on-site personnel.
+
+* **Tier 1: Remote Support (Primary):**
+
+  * **Method:** AnyDesk, TeamViewer, or Video Call.
+
+  * **Rate:** **₱1,000 per incident**.
+
+  * **Scope:** Software configuration, training refresher, or data correction.
+
+  * **Note:** If the issue is a verified **Software Bug** (our fault), this fee is **waived (FREE)**.
+
+* **Tier 2: On-Site Visit (Escalation):**
+
+  * **Method:** Physical deployment to shop.
+
+  * **Rate:** **₱3,000 per visit** (within city limits).
+
+  * **Condition:** Charged *only* if the issue requires physical presence (e.g., Printer hardware failure, Network cabling, or if client refuses remote access).
+
+* **Benefit:** The client saves money by using Remote Support first, and we save travel time.
+
+### 10.0 Domain name options:
+
+* **zorviz.app** For launching
+* **zorviz.ph** Once cash flow is coming. 
+
+```

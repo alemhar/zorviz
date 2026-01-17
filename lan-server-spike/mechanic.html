@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mechanic Mobile View</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .success-badge {
+            background: #10b981;
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .job-card {
+            padding: 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            margin: 12px 0;
+        }
+
+        .job-card h3 {
+            margin: 0 0 10px 0;
+            color: #1f2937;
+        }
+
+        .job-card p {
+            margin: 5px 0;
+            color: #6b7280;
+        }
+
+        button {
+            width: 100%;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:active {
+            background: #5568d3;
+        }
+
+        .timestamp {
+            text-align: center;
+            color: white;
+            margin-top: 20px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Mechanic Dashboard</h1>
+
+        <div class="success-badge">
+            ✅ Connected to Shop Server
+        </div>
+
+        <div class="card">
+            <h2 style="margin-top: 0;">Active Jobs</h2>
+
+            <div class="job-card">
+                <h3>Toyota Vios - ABC 1234</h3>
+                <p><strong>Service:</strong> Aircon Compressor Replacement</p>
+                <p><strong>Status:</strong> In Progress</p>
+                <button onclick="updateStatus(1)">Mark as Done</button>
+            </div>
+
+            <div class="job-card">
+                <h3>Honda Civic - XYZ 5678</h3>
+                <p><strong>Service:</strong> Aircon Cleaning</p>
+                <p><strong>Status:</strong> Pending</p>
+                <button onclick="updateStatus(2)">Start Job</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0;">Test API Connection</h3>
+            <button onclick="testApi()">Fetch Server Time</button>
+            <p id="apiResult" style="margin-top: 15px; color: #6b7280;"></p>
+        </div>
+
+        <div class="timestamp" id="connectionTime"></div>
+    </div>
+
+    <script>
+        // Display connection time
+        document.getElementById('connectionTime').textContent =
+            `Connected at ${new Date().toLocaleTimeString()}`;
+
+        async function testApi() {
+            const resultEl = document.getElementById('apiResult');
+            resultEl.textContent = 'Fetching...';
+
+            try {
+                const response = await fetch('/api/time');
+                const data = await response.json();
+                resultEl.textContent = `✅ Server Time: ${data.time}`;
+                resultEl.style.color = '#10b981';
+            } catch (error) {
+                resultEl.textContent = `❌ Error: ${error.message}`;
+                resultEl.style.color = '#ef4444';
+            }
+        }
+
+        function updateStatus(jobId) {
+            alert(`Job ${jobId} status updated! (This would call the API in real implementation)`);
+        }
+    </script>
+</body>
+
+</html>

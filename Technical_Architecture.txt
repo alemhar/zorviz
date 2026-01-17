@@ -1,0 +1,29 @@
+# Master Architecture: Zorviz Modular Suite
+
+## 1. Context for AI Assistant
+
+**Objective:** Build a modular, Local-First SaaS.
+**Constraint:** You are building **Zorviz** (The Repair Shop App), but you must structure the code as a **Modular ERP Platform**.
+
+* **Do NOT** hardcode "Mechanic" or "Car" into the core database.
+
+* **DO** use abstract terms (`Resource`, `Asset`, `Order`) and extend them.
+
+* **DO** use a Monorepo to share logic between the Local Desktop App (Tauri) and Cloud App (Next.js).
+
+## 2. Directory Structure (Monorepo)
+
+```text
+/zorviz-monorepo
+├── apps
+│   ├── cloud        # Next.js (Customer Portal + Owner Dashboard)
+│   ├── desktop      # Tauri + React (Shop Admin + Mechanic Local Server)
+├── packages
+│   ├── core         # SHARED BUSINESS LOGIC (The "ERP Core")
+│   │   ├── src
+│   │   │   ├── schema.ts      # Drizzle ORM (Shared SQLite/Postgres)
+│   │   │   ├── types.ts       # Shared TypeScript Interfaces
+│   │   │   ├── calculations.ts # Tax, Totals, Commission Logic
+│   │   │   └── validation.ts  # Zod Schemas (Inputs)
+│   ├── ui           # Shared React Components (shadcn/ui + Tailwind)
+│   └── sync-engine  # Shared Replication Logic
