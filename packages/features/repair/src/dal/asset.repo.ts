@@ -1,11 +1,9 @@
-
-import { eq, or, like, desc, sql } from 'drizzle-orm';
-import { assets, bookings } from '@zorviz/db';
-import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
+import { Kysely, sql } from 'kysely';
+import type { Database } from '@zorviz/db';
 import { AssetWithHistory, CreateAssetInput } from '../types';
 
 export class AssetRepository {
-    constructor(private db: SqliteRemoteDatabase<any>) { }
+    constructor(private db: Kysely<Database>) { }
 
     /**
      * Search assets by a general query string (License Plate, VIN, etc.)
@@ -14,31 +12,29 @@ export class AssetRepository {
     async search(query: string): Promise<AssetWithHistory[]> {
         const lowerQuery = `%${query.toLowerCase()}%`;
 
-        // Note: 'specs' is JSON, so we use 'like' on the text representation for now.
-        // In a real SQLite JSON1 extension environment, we could use json_extract.
-        // For MVP flexibility: LIKE %query% on specs column.
+        const results = await this.db
+            .selectFrom('assets')
+            .selectAll()
+            .where((eb) =>
+                eb.or([
+                    eb('id', 'like', lowerQuery),
+                    eb('specs', 'like', lowerQuery)
+                ])
+            )
+            .limit(10)
+            .execute();
 
-        const results = await this.db.select()
-            .from(assets)
-            .where(or(
-                like(assets.id, lowerQuery),
-                like(assets.specs, lowerQuery)
-            ))
-            .limit(10);
-
-        // Enhance with pending bookings (N+1 query for MVP simplicity, separate later if slow)
+        // Enhance with pending bookings
         const assetsWithBookings: AssetWithHistory[] = [];
 
         for (const asset of results) {
-            const pending = await this.db.select()
-                .from(bookings)
-                .where(
-                    // bookings.assetId == asset.id AND status != 'completed'
-                    // For "Today's", we would filter by date.
-                    // For now, let's just get any active booking.
-                    sql`${bookings.assetId} = ${asset.id} AND ${bookings.status} IN ('pending', 'confirmed')`
-                )
-                .limit(1);
+            const pending = await this.db
+                .selectFrom('bookings')
+                .selectAll()
+                .where('asset_id', '=', asset.id)
+                .where('status', 'in', ['pending', 'confirmed'])
+                .limit(1)
+                .execute();
 
             assetsWithBookings.push({
                 ...asset,
@@ -51,20 +47,25 @@ export class AssetRepository {
     }
 
     async create(input: CreateAssetInput): Promise<AssetWithHistory> {
-        const id = globalThis.crypto.randomUUID();
-        const now = new Date();
+        const id = crypto.randomUUID();
+        const now = Date.now();
 
-        await this.db.insert(assets).values({
+        await this.db.insertInto('assets').values({
             id,
-            tenantId: input.tenantId || 'default-tenant', // MVP Fallback
-            ownerId: input.ownerId || null, // Allow NULL for draft/quick create
+            tenant_id: input.tenantId || 'default-tenant',
+            owner_id: input.ownerId || null,
             type: input.type,
             specs: JSON.stringify(input.specs),
-            createdAt: now,
-            updatedAt: now,
-        });
+            created_at: now,
+            updated_at: now,
+            deleted_at: null
+        }).execute();
 
-        const newAsset = await this.db.select().from(assets).where(eq(assets.id, id)).get();
+        const newAsset = await this.db
+            .selectFrom('assets')
+            .selectAll()
+            .where('id', '=', id)
+            .executeTakeFirst();
 
         if (!newAsset) throw new Error("Failed to create asset");
 

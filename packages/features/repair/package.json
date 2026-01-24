@@ -12,6 +12,7 @@
         "@zorviz/core": "*",
         "@zorviz/db": "*",
         "@zorviz/ui": "*",
+        "kysely": "^0.28.10",
         "react": "^18.0.0",
         "uuid": "^13.0.0"
     },

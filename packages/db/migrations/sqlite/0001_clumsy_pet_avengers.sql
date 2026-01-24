@@ -3,6 +3,8 @@ CREATE TABLE `app_config` (
 	`tenant_id` text NOT NULL,
 	`branch_id` text NOT NULL,
 	`device_name` text NOT NULL,
+	`currency_symbol` text DEFAULT '$' NOT NULL,
+	`locale` text DEFAULT 'en-US' NOT NULL,
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
 );

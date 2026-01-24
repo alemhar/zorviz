@@ -1,8 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { db } from "../lib/db";
-import { users } from "@zorviz/db";
-import { eq } from "drizzle-orm";
 
 interface User {
     id: string;
@@ -14,8 +12,17 @@ interface User {
 interface AuthState {
     user: User | null;
     isAuthenticated: boolean;
-    login: (email: string, role: User["role"]) => Promise<void>;
+    login: (email: string, password: string) => Promise<void>;
     logout: () => void;
+}
+
+// Simple hash function using Web Crypto API (browser-compatible)
+async function hashPassword(password: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -23,22 +30,31 @@ export const useAuthStore = create<AuthState>()(
         (set) => ({
             user: null,
             isAuthenticated: false,
-            login: async (email, _role) => {
-                // Real DB Login
-                const found = await db.select().from(users).where(eq(users.email, email)).limit(1);
+            login: async (email, password) => {
+                // Kysely query - type-safe and elegant
+                const userRecord = await db
+                    .selectFrom('users')
+                    .select(['id', 'email', 'role', 'password_hash'])
+                    .where('email', '=', email)
+                    .limit(1)
+                    .executeTakeFirst();
 
-                if (found.length === 0) {
+                if (!userRecord) {
                     throw new Error("User not found");
                 }
 
-                const userRecord = found[0];
+                // Verify password
+                const passwordHash = await hashPassword(password);
+                if (userRecord.password_hash !== passwordHash) {
+                    throw new Error("Invalid password");
+                }
 
                 set({
                     user: {
                         id: userRecord.id,
-                        name: email.split('@')[0], // Simple name derivation
+                        name: email.split('@')[0],
                         email: userRecord.email,
-                        role: userRecord.role as User["role"],
+                        role: userRecord.role,
                     },
                     isAuthenticated: true,
                 });

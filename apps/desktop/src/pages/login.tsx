@@ -8,7 +8,9 @@ import { seedDevData } from "../lib/seeder";
 export default function LoginPage() {
     const navigate = useNavigate();
     const login = useAuthStore((state) => state.login);
-    const [email, setEmail] = useState("");
+    // Prefilled for easy testing
+    const [email, setEmail] = useState("admin@zorviz.com");
+    const [password, setPassword] = useState("admin123");
     const [role, setRole] = useState<"admin" | "advisor" | "mechanic">("admin");
     const [isLoading, setIsLoading] = useState(false);
     const [seedStatus, setSeedStatus] = useState<string>("");
@@ -17,11 +19,11 @@ export default function LoginPage() {
         e.preventDefault();
         setIsLoading(true);
         try {
-            await login(email, role);
+            await login(email, password);
             navigate("/");
         } catch (err) {
             console.error(err);
-            alert("Login failed! Did you seed the database?");
+            alert("Login failed! Check email/password or seed the database.");
         } finally {
             setIsLoading(false);
         }
@@ -34,6 +36,7 @@ export default function LoginPage() {
             setSeedStatus("Done!");
             // Auto fill for convenience
             setEmail("admin@zorviz.com");
+            setPassword("admin123");
         } catch (e) {
             console.error(e);
             setSeedStatus("Error");
@@ -91,9 +94,22 @@ export default function LoginPage() {
                             <Label htmlFor="email">Email</Label>
                             <Input
                                 id="email"
+                                type="email"
                                 placeholder="Ex. admin@zorviz.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                placeholder="Enter your password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
                         </div>

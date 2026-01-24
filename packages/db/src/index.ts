@@ -1,1 +1,2 @@
-export * from './schema.sqlite';
+// Kysely Database Types
+export * from './types';

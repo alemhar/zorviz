@@ -1,51 +1,79 @@
+import { db } from "./db";
 
-import { db } from "../lib/db";
-import { users, appConfig } from "@zorviz/db";
-import { eq } from "drizzle-orm";
+// Simple hash function using Web Crypto API (browser-compatible)
+async function hashPassword(password: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Default password for dev users
+const DEV_PASSWORD = "admin123";
 
 export const seedDevData = async () => {
-    // 1. Check if AppConfig exists
-    const config = await db.select().from(appConfig).limit(1);
+    const passwordHash = await hashPassword(DEV_PASSWORD);
+    const now = Date.now();
 
-    if (config.length === 0) {
+    // 1. Check if AppConfig exists
+    const config = await db
+        .selectFrom('app_config')
+        .select('id')
+        .limit(1)
+        .executeTakeFirst();
+
+    if (!config) {
         console.log("Seeding App Config...");
-        await db.insert(appConfig).values({
+        await db.insertInto('app_config').values({
             id: "default",
-            tenantId: "dev-tenant-id",
-            branchId: "main-branch",
-            deviceName: "Dev PC",
-            createdAt: new Date(),
-            updatedAt: new Date()
-        });
+            tenant_id: "dev-tenant-id",
+            branch_id: "main-branch",
+            device_name: "Dev PC",
+            currency_symbol: "₱", // Philippine Peso for dev
+            locale: "en-PH",
+            created_at: now,
+            updated_at: now
+        }).execute();
     }
 
     // 2. Check if Admin User exists
-    const admin = await db.select().from(users).where(eq(users.email, "admin@zorviz.com")).limit(1);
+    const admin = await db
+        .selectFrom('users')
+        .select('id')
+        .where('email', '=', 'admin@zorviz.com')
+        .limit(1)
+        .executeTakeFirst();
 
-    if (admin.length === 0) {
+    if (!admin) {
         console.log("Seeding Admin User...");
-        await db.insert(users).values({
-            id: globalThis.crypto.randomUUID(),
+        await db.insertInto('users').values({
+            id: crypto.randomUUID(),
             email: "admin@zorviz.com",
             role: "admin",
-            passwordHash: "mock-hash", // No real auth for dev yet
-            createdAt: new Date(),
-            updatedAt: new Date()
-        });
+            password_hash: passwordHash,
+            created_at: now,
+            updated_at: now
+        }).execute();
     }
 
     // 3. Seed Mechanic User
-    const mechanic = await db.select().from(users).where(eq(users.email, "mechanic@zorviz.com")).limit(1);
+    const mechanic = await db
+        .selectFrom('users')
+        .select('id')
+        .where('email', '=', 'mechanic@zorviz.com')
+        .limit(1)
+        .executeTakeFirst();
 
-    if (mechanic.length === 0) {
+    if (!mechanic) {
         console.log("Seeding Mechanic User...");
-        await db.insert(users).values({
-            id: globalThis.crypto.randomUUID(),
+        await db.insertInto('users').values({
+            id: crypto.randomUUID(),
             email: "mechanic@zorviz.com",
             role: "mechanic",
-            passwordHash: "mock-hash",
-            createdAt: new Date(),
-            updatedAt: new Date()
-        });
+            password_hash: passwordHash,
+            created_at: now,
+            updated_at: now
+        }).execute();
     }
 };

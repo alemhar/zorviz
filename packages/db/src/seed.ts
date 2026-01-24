@@ -44,15 +44,17 @@ if (!existingConfig) {
     console.log("Seeding App Config...");
     const now = Date.now();
     db.prepare(`
-        INSERT INTO app_config (id, tenant_id, branch_id, device_name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    `).run('default', 'dev-tenant-id', 'main-branch', 'Console-Seeder', now, now);
+        INSERT INTO app_config (id, tenant_id, branch_id, device_name, currency_symbol, locale, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('default', 'dev-tenant-id', 'main-branch', 'Console-Seeder', '₱', 'en-PH', now, now);
 } else {
     console.log("App Config already exists.");
 }
 
 // 2. Users
 const seedUser = (email: string, role: string) => {
+    // SHA-256 hash of 'admin123'
+    const passwordHash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
     const existing = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
     if (!existing) {
         console.log(`Seeding User: ${email}`);
@@ -60,7 +62,7 @@ const seedUser = (email: string, role: string) => {
         db.prepare(`
             INSERT INTO users (id, email, role, password_hash, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
-        `).run(uuidv4(), email, role, 'mock-hash', now, now);
+        `).run(uuidv4(), email, role, passwordHash, now, now);
     } else {
         console.log(`User ${email} already exists.`);
     }

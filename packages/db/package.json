@@ -14,12 +14,11 @@
         "@zorviz/core": "*",
         "better-sqlite3": "^12.6.2",
         "dotenv": "^17.2.3",
-        "drizzle-orm": "^0.29.3",
+        "kysely": "^0.28.10",
         "tsx": "^4.21.0",
         "uuid": "^13.0.0"
     },
     "devDependencies": {
-        "drizzle-kit": "^0.20.13",
         "typescript": "^5.0.0"
     }
 }
