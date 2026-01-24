@@ -1,6 +1,6 @@
 use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite};
 use std::fs;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 pub struct DbState {
     pub pool: Pool<Sqlite>,
@@ -54,7 +54,6 @@ pub async fn execute_sql(
 ) -> Result<Vec<serde_json::Value>, String> {
     use sqlx::Row;
     use sqlx::Column;
-    use sqlx::TypeInfo;
 
     let mut query = sqlx::query(&sql);
 
