@@ -3,6 +3,7 @@ import { ThemeProvider } from "@zorviz/ui";
 import { useAuthStore } from "./stores/auth";
 import LoginPage from "./pages/login";
 import DashboardPage from "./pages/dashboard";
+import RepairPage from "./pages/repair";
 import "@zorviz/ui/src/styles.css";
 
 function App() {
@@ -19,6 +20,10 @@ function App() {
           <Route
             path="/"
             element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/repair"
+            element={isAuthenticated ? <RepairPage /> : <Navigate to="/login" />}
           />
         </Routes>
       </HashRouter>

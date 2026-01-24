@@ -1,0 +1,20 @@
+{
+    "name": "@zorviz/feature-inventory",
+    "version": "0.0.0",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "scripts": {
+        "lint": "eslint .",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@zorviz/core": "*",
+        "@zorviz/db": "*",
+        "@zorviz/ui": "*",
+        "react": "^18.0.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0",
+        "@types/react": "^18.0.0"
+    }
+}

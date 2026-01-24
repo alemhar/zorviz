@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { db } from "../lib/db";
+import { users } from "@zorviz/db";
+import { eq } from "drizzle-orm";
 
 interface User {
     id: string;
@@ -20,15 +23,22 @@ export const useAuthStore = create<AuthState>()(
         (set) => ({
             user: null,
             isAuthenticated: false,
-            login: async (email, role) => {
-                // Mock login for now
-                // TODO: Validate against DB
+            login: async (email, _role) => {
+                // Real DB Login
+                const found = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+                if (found.length === 0) {
+                    throw new Error("User not found");
+                }
+
+                const userRecord = found[0];
+
                 set({
                     user: {
-                        id: "1",
-                        name: "Test User",
-                        email,
-                        role,
+                        id: userRecord.id,
+                        name: email.split('@')[0], // Simple name derivation
+                        email: userRecord.email,
+                        role: userRecord.role as User["role"],
                     },
                     isAuthenticated: true,
                 });

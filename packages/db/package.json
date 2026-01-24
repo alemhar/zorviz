@@ -5,11 +5,18 @@
     "types": "./src/index.ts",
     "scripts": {
         "generate:sqlite": "drizzle-kit generate:sqlite --schema=./src/schema.sqlite.ts --out=./migrations/sqlite",
-        "generate:pg": "drizzle-kit generate:pg --schema=./src/schema.postgres.ts --out=./migrations/pg"
+        "generate:pg": "drizzle-kit generate:pg --schema=./src/schema.postgres.ts --out=./migrations/pg",
+        "seed": "tsx ./src/seed.ts"
     },
     "dependencies": {
+        "@types/better-sqlite3": "^7.6.13",
+        "@types/uuid": "^10.0.0",
+        "@zorviz/core": "*",
+        "better-sqlite3": "^12.6.2",
+        "dotenv": "^17.2.3",
         "drizzle-orm": "^0.29.3",
-        "@zorviz/core": "*"
+        "tsx": "^4.21.0",
+        "uuid": "^13.0.0"
     },
     "devDependencies": {
         "drizzle-kit": "^0.20.13",

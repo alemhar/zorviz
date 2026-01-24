@@ -25,7 +25,7 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet, server::get_server_url])
+        .invoke_handler(tauri::generate_handler![greet, server::get_server_url, db::execute_sql])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

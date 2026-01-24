@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/auth";
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@zorviz/ui";
-import { Wrench, Shield, Key } from "lucide-react";
+import { Wrench, Shield, Key, Database } from "lucide-react";
+import { seedDevData } from "../lib/seeder";
 
 export default function LoginPage() {
     const navigate = useNavigate();
@@ -10,19 +11,46 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [role, setRole] = useState<"admin" | "advisor" | "mechanic">("admin");
     const [isLoading, setIsLoading] = useState(false);
+    const [seedStatus, setSeedStatus] = useState<string>("");
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        // Simulate delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        await login(email, role);
-        setIsLoading(false);
-        navigate("/");
+        try {
+            await login(email, role);
+            navigate("/");
+        } catch (err) {
+            console.error(err);
+            alert("Login failed! Did you seed the database?");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSeed = async () => {
+        setSeedStatus("Seeding...");
+        try {
+            await seedDevData();
+            setSeedStatus("Done!");
+            // Auto fill for convenience
+            setEmail("admin@zorviz.com");
+        } catch (e) {
+            console.error(e);
+            setSeedStatus("Error");
+        }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
+
+            {/* Dev Tool: Manual Seed */}
+            <div className="absolute top-4 right-4">
+                <Button variant="outline" size="sm" onClick={handleSeed} disabled={seedStatus === "Seeding..."}>
+                    <Database className="w-4 h-4 mr-2" />
+                    {seedStatus || "Seed DB"}
+                </Button>
+            </div>
+
             <Card className="w-full max-w-md">
                 <CardHeader className="space-y-1">
                     <div className="flex justify-center mb-4">
@@ -46,8 +74,8 @@ export default function LoginPage() {
                                         key={r}
                                         onClick={() => setRole(r)}
                                         className={`cursor-pointer border rounded-md p-2 flex flex-col items-center gap-2 transition-colors ${role === r
-                                                ? "bg-primary/10 border-primary text-primary"
-                                                : "hover:bg-muted"
+                                            ? "bg-primary/10 border-primary text-primary"
+                                            : "hover:bg-muted"
                                             }`}
                                     >
                                         {r === "admin" && <Shield className="w-4 h-4" />}
@@ -63,7 +91,7 @@ export default function LoginPage() {
                             <Label htmlFor="email">Email</Label>
                             <Input
                                 id="email"
-                                placeholder="Ex. mechanics@zorviz.com"
+                                placeholder="Ex. admin@zorviz.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
