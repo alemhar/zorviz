@@ -4,7 +4,7 @@ import { useAppConfigStore } from "../stores/app-config";
 import { Button, ThemeSwitcher } from "@zorviz/ui";
 import { useNavigate } from "react-router-dom";
 import { ServerStatus } from "../components/server-status";
-import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp, DatabaseBackup } from "lucide-react";
+import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp, DatabaseBackup, Users } from "lucide-react";
 import { BackupDialog } from "../features/backup/BackupDialog";
 
 export default function DashboardPage() {
@@ -37,6 +37,15 @@ export default function DashboardPage() {
             href: "/jobs",
             color: "from-amber-500 to-amber-600",
         },
+        ...(user?.role === "admin" || user?.role === "owner"
+            ? [{
+                title: "Staff",
+                description: "Manage staff logins",
+                icon: Users,
+                href: "/users",
+                color: "from-violet-500 to-violet-600",
+            }]
+            : []),
         {
             title: "Inventory",
             description: "Track parts and stock levels",

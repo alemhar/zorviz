@@ -11,6 +11,7 @@ import DashboardPage from "./pages/dashboard";
 import RepairPage from "./pages/repair";
 import JobTicketPage from "./pages/job-ticket";
 import JobsPage from "./pages/jobs";
+import UsersPage from "./pages/users";
 import "@zorviz/ui/src/styles.css";
 
 function App() {
@@ -60,6 +61,10 @@ function App() {
                 <Route
                   path="/jobs"
                   element={isAuthenticated ? <JobsPage /> : <Navigate to="/login" />}
+                />
+                <Route
+                  path="/users"
+                  element={isAuthenticated ? <UsersPage /> : <Navigate to="/login" />}
                 />
                 <Route path="*" element={<Navigate to="/" />} />
               </>

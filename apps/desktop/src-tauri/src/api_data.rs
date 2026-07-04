@@ -642,7 +642,8 @@ pub async fn set_backup_dir(
 
 // ---- Users / mechanic assignment & execution ----
 
-/// GET /api/users?role=mechanic — list active users (never returns pin fields). Auth required.
+/// GET /api/users?role=mechanic&all=1 — list users (never returns pin fields). `all=1` includes
+/// deactivated users (for management). Auth required.
 pub async fn list_users(
     State(state): State<ApiState>,
     headers: HeaderMap,
@@ -651,18 +652,141 @@ pub async fn list_users(
     if session_from_headers(&state, &headers).is_none() {
         return Err(StatusCode::UNAUTHORIZED);
     }
+    let include_all = params.contains_key("all");
     let rows = if let Some(role) = params.get("role") {
-        sqlx::query("SELECT id, name, username, role FROM users WHERE role = ? AND is_active = 1 ORDER BY name")
+        sqlx::query("SELECT id, name, username, role, is_active FROM users WHERE role = ? AND is_active = 1 ORDER BY name")
             .bind(role)
             .fetch_all(&state.pool)
             .await
+    } else if include_all {
+        sqlx::query("SELECT id, name, username, role, is_active FROM users ORDER BY is_active DESC, name")
+            .fetch_all(&state.pool)
+            .await
     } else {
-        sqlx::query("SELECT id, name, username, role FROM users WHERE is_active = 1 ORDER BY name")
+        sqlx::query("SELECT id, name, username, role, is_active FROM users WHERE is_active = 1 ORDER BY name")
             .fetch_all(&state.pool)
             .await
     }
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(rows.iter().map(|r| Value::Object(row_to_json(r))).collect()))
+}
+
+// Require an admin/owner session. Returns Err(status) otherwise.
+fn require_admin(state: &ApiState, headers: &HeaderMap) -> Result<(), StatusCode> {
+    match session_from_headers(state, headers) {
+        None => Err(StatusCode::UNAUTHORIZED),
+        Some(s) if s.role == "admin" || s.role == "owner" => Ok(()),
+        Some(_) => Err(StatusCode::FORBIDDEN),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CreateUserReq {
+    name: String,
+    username: String,
+    role: String,
+    pin: String,
+}
+
+/// POST /api/users — create a staff user (admin/owner only).
+pub async fn create_user(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(req): Json<CreateUserReq>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    require_admin(&state, &headers).map_err(|s| (s, "admin only".to_string()))?;
+    let username = req.username.trim().to_string();
+    if req.name.trim().is_empty() || username.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "name and username are required".to_string()));
+    }
+    if req.pin.len() < 4 || !req.pin.chars().all(|c| c.is_ascii_digit()) {
+        return Err((StatusCode::BAD_REQUEST, "PIN must be at least 4 digits".to_string()));
+    }
+    let taken: i64 = sqlx::query("SELECT COUNT(*) AS c FROM users WHERE username = ?")
+        .bind(&username)
+        .fetch_one(&state.pool)
+        .await
+        .ok()
+        .and_then(|r| r.try_get::<i64, _>("c").ok())
+        .unwrap_or(0);
+    if taken > 0 {
+        return Err((StatusCode::CONFLICT, "username already taken".to_string()));
+    }
+
+    let (hash, salt) = crate::auth::hash_pin(&req.pin);
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = now_ms();
+    sqlx::query(
+        "INSERT INTO users (id, name, username, pin_hash, pin_salt, role, is_active, created_at, updated_at) \
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+    )
+    .bind(&id)
+    .bind(req.name.trim())
+    .bind(&username)
+    .bind(&hash)
+    .bind(&salt)
+    .bind(&req.role)
+    .bind(now)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "create failed".to_string()))?;
+
+    let row = sqlx::query("SELECT id, name, username, role, is_active FROM users WHERE id = ? LIMIT 1")
+        .bind(&id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "read failed".to_string()))?;
+    Ok(Json(Value::Object(row_to_json(&row))))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateUserReq {
+    name: Option<String>,
+    role: Option<String>,
+    is_active: Option<i64>,
+    pin: Option<String>,
+}
+
+/// PUT /api/users/:id — update a user's name/role/active state, and/or reset PIN (admin/owner only).
+pub async fn update_user(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(req): Json<UpdateUserReq>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    require_admin(&state, &headers).map_err(|s| (s, "admin only".to_string()))?;
+    let now = now_ms();
+    let err = |_e| (StatusCode::INTERNAL_SERVER_ERROR, "update failed".to_string());
+
+    if let Some(name) = req.name.as_ref().filter(|n| !n.trim().is_empty()) {
+        sqlx::query("UPDATE users SET name = ?, updated_at = ? WHERE id = ?")
+            .bind(name.trim()).bind(now).bind(&id).execute(&state.pool).await.map_err(err)?;
+    }
+    if let Some(role) = req.role.as_ref() {
+        sqlx::query("UPDATE users SET role = ?, updated_at = ? WHERE id = ?")
+            .bind(role).bind(now).bind(&id).execute(&state.pool).await.map_err(err)?;
+    }
+    if let Some(active) = req.is_active {
+        sqlx::query("UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?")
+            .bind(active).bind(now).bind(&id).execute(&state.pool).await.map_err(err)?;
+    }
+    if let Some(pin) = req.pin.as_ref() {
+        if pin.len() < 4 || !pin.chars().all(|c| c.is_ascii_digit()) {
+            return Err((StatusCode::BAD_REQUEST, "PIN must be at least 4 digits".to_string()));
+        }
+        let (hash, salt) = crate::auth::hash_pin(pin);
+        sqlx::query("UPDATE users SET pin_hash = ?, pin_salt = ?, updated_at = ? WHERE id = ?")
+            .bind(&hash).bind(&salt).bind(now).bind(&id).execute(&state.pool).await.map_err(err)?;
+    }
+
+    let row = sqlx::query("SELECT id, name, username, role, is_active FROM users WHERE id = ? LIMIT 1")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(err)?
+        .ok_or((StatusCode::NOT_FOUND, "user not found".to_string()))?;
+    Ok(Json(Value::Object(row_to_json(&row))))
 }
 
 #[derive(Deserialize)]

@@ -54,6 +54,15 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     diff == 0
 }
 
+/// Hash a PIN with a fresh random salt (same PBKDF2 params as verify). Returns (hash_hex, salt_hex).
+pub fn hash_pin(pin: &str) -> (String, String) {
+    let mut salt = [0u8; 16];
+    rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut salt);
+    let mut out = [0u8; DK_LEN];
+    pbkdf2_hmac::<Sha256>(pin.as_bytes(), &salt, PBKDF2_ITERS, &mut out);
+    (hex::encode(out), hex::encode(salt))
+}
+
 fn verify_pin(pin: &str, hash_hex: &str, salt_hex: &str) -> bool {
     let (salt, expected) = match (hex::decode(salt_hex), hex::decode(hash_hex)) {
         (Ok(s), Ok(h)) => (s, h),

@@ -6,6 +6,32 @@
 
 ---
 
+## ✅ BACK-0-C007 · Minimal User Management
+
+**Completed:** 2026-07-04
+**Original Backlog ID:** BACK-0-007
+**Traces to:** D8, D15
+
+**What was implemented:**
+- **Server-side PIN hashing** — `auth::hash_pin` (Rust PBKDF2, same params as verify) so staff can be created
+  via the API (no client-side hashing).
+- Endpoints (all **admin/owner-guarded** via `require_admin`): `POST /api/users` (create — validates PIN ≥4
+  digits, rejects duplicate username with 409), `PUT /api/users/:id` (update name/role/is_active and/or reset
+  PIN), `GET /api/users?all=1` (list incl. deactivated). Login already rejects `is_active = 0` users.
+- **Users page** (`pages/users.tsx`, route `/users`) — admin-only dashboard **Staff** card → list of staff
+  (name, @username, role, inactive tag), Add User dialog (name, username, role, PIN), Edit dialog
+  (role, active toggle, optional PIN reset).
+
+**Verification (curl + Playwright):** admin creates advisor → advisor logs in; advisor creating a user → **403**
+(admin-guard); duplicate username → **409**; deactivate → login **blocked**; reactivate + **PIN reset** → login
+works with the new PIN. UI: Staff card → Users page → Add User dialog, zero console errors.
+
+**Key files:**
+- `apps/desktop/src-tauri/src/auth.rs` (hash_pin), `apps/desktop/src-tauri/src/api_data.rs`, `src/server.rs`
+- `apps/desktop/src/lib/users-api.ts`, `apps/desktop/src/pages/users.tsx` (new), `apps/desktop/src/App.tsx`, `apps/desktop/src/pages/dashboard.tsx`
+
+---
+
 ## ✅ BACK-0-C008 · Backup & Restore (Local)
 
 **Completed:** 2026-07-04

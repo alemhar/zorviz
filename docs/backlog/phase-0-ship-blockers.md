@@ -1,6 +1,6 @@
 # Phase 0 Backlog — v1 Ship Blockers & Foundation
 
-> **Status:** In progress — 8 of 13 complete (BACK-0-001, 002, 003, 004, 006, 008, 009, 010 ✅) + BACK-0-005 increments 1–3 (LAN, phone-verified). Remaining: BACK-0-007 (user mgmt), 011 (dashboard stats), 013 (logo upload), 012 (online enforcement — deferred).
+> **Status:** In progress — 9 of 13 complete (BACK-0-001, 002, 003, 004, 006, 007, 008, 009, 010 ✅) + BACK-0-005 increments 1–3 (LAN, phone-verified). Remaining: BACK-0-011 (dashboard stats), 013 (logo upload), 012 (online enforcement — deferred).
 > **Scope:** Foundation fixes and new cross-cutting infrastructure required before Zorviz can ship a
 > usable v1 to a real shop. Derived from the plan/design audit (2026-07-04) and owner decisions in
 > [`v1-decisions.md`](./v1-decisions.md).
@@ -58,23 +58,6 @@ mobile = admin/advisor/mechanic. Built in the 4 increments listed in D23.
 - [ ] All mechanic-facing views mobile-first: ≥44px touch targets, ~430px layout *(Plan.txt)*
 - [x] Server binds to LAN IP; reachable from the network interface *(Increment 2; physical-phone test pending Increment 3)*
 - [~] Basic hardening: CORS locked to app origins (no wildcard) done *(Increment 2)*; per-endpoint input validation ongoing as endpoints are added *(Increment 3)*
-
----
-
-## BACK-0-007 · Minimal User Management
-
-**Priority:** 🟡 P1
-**Area:** `apps/desktop/src/pages/users.tsx` (new), admin-only
-**Traces to:** D8
-**Description:**
-After the wizard creates the admin, the admin needs to add staff (mechanics/advisors) who log in from
-phones. Minimal CRUD.
-
-**Acceptance Criteria:**
-- [ ] Admin-only page (role-guarded) to list, add, and deactivate users
-- [ ] Add user: name, role (admin/advisor/mechanic), username, initial PIN
-- [ ] Reset PIN / deactivate user
-- [ ] Uses the customers/users tables via Kysely (no raw SQL)
 
 ---
 
