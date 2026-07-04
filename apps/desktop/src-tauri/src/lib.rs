@@ -4,6 +4,7 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+pub mod api_data;
 pub mod auth;
 pub mod db;
 pub mod server;

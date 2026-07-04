@@ -36,13 +36,19 @@ mobile = admin/advisor/mechanic. Built in the 4 increments listed in D23.
   asset 200, CORS allows tauri origin + rejects evil.example, LAN IP `:3030` serves 200. **Physical-phone
   end-to-end deferred to after Increment 3** (the phone loads but config/data still use `invoke`; it becomes
   fully functional once reads move to HTTP).
-- ⏳ Increment 3 — data endpoints (assets/config first) + migrate off `invoke`; Increment 4 — retire `execute_sql`.
+- ✅ **Increment 3 (first data endpoints + frontend migration) — done 2026-07-04.** Rust `api_data.rs`:
+  `GET /api/config` (public — needed pre-login), `GET /api/assets?q=` + `POST /api/assets` (auth-guarded);
+  generic `row_to_json` (NULL-safe) + `specs` JSON expansion; `tenant_id` sourced from `app_config` on create.
+  Frontend migrated off `invoke`: app-config store + `repair-api.ts` + `AssetDiscovery` use the HTTP API;
+  `ServerStatus` guarded for non-Tauri; `lib/db.ts` trimmed (Kysely now only for the desktop wizard).
+  Verified via curl: config returns nullable fields as null, asset create/search work with auth, 401 without.
+- ⏳ Increment 4 — migrate the setup wizard writes to the API + retire `execute_sql`/`invoke` data path.
 
 **Acceptance Criteria:**
 - [x] Architecture decision recorded: **single path** (D23)
 - [~] LAN session auth: token sessions + role data done (Increment 1); login *from a phone browser* pending Increment 2 *(D15)*
-- [ ] axum exposes authenticated REST endpoints for the entities mechanics need (jobs/orders, assets,
-      order_items, customers) — no generic raw-SQL endpoint exposed to the network *(Increment 3)*
+- [~] axum exposes authenticated REST endpoints — pattern established with config + assets (Increment 3);
+      orders/order_items/customers endpoints added as those features are built. No raw-SQL over the network.
 - [x] Built frontend served over LAN from the axum server *(Increment 2 — embedded SPA)*
 - [ ] All mechanic-facing views mobile-first: ≥44px touch targets, ~430px layout *(Plan.txt)*
 - [x] Server binds to LAN IP; reachable from the network interface *(Increment 2; physical-phone test pending Increment 3)*

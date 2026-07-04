@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
+use crate::api_data;
 use crate::auth::{self, ApiState, AuthState};
 
 const PORT: u16 = 3030;
@@ -96,6 +97,11 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
         .route("/api/login", post(auth::login))
         .route("/api/logout", post(auth::logout))
         .route("/api/me", get(auth::me))
+        .route("/api/config", get(api_data::get_config))
+        .route(
+            "/api/assets",
+            get(api_data::search_assets).post(api_data::create_asset),
+        )
         .fallback(static_handler) // serve the SPA for everything else
         .layer(cors_layer())
         .with_state(api_state);

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { db } from "../lib/db";
+import { api } from "../lib/api";
 import type { AppConfig } from "@zorviz/db";
 
 interface AppConfigState {
@@ -18,12 +18,7 @@ export const useAppConfigStore = create<AppConfigState>((set) => ({
     fetchConfig: async () => {
         set({ isLoading: true });
         try {
-            const config = await db
-                .selectFrom("app_config")
-                .selectAll()
-                .where("id", "=", "default")
-                .executeTakeFirst();
-
+            const config = await api.get<AppConfig | null>("/api/config");
             set({
                 config: config ?? null,
                 isSetup: !!config,
@@ -32,7 +27,7 @@ export const useAppConfigStore = create<AppConfigState>((set) => ({
             });
         } catch (e) {
             console.error("Failed to fetch app config:", e);
-            // A query failure (e.g. DB not ready) is treated as "not checked yet"
+            // A failure (e.g. server not ready) is treated as "checked, not set up".
             set({ isChecked: true, isLoading: false });
         }
     },

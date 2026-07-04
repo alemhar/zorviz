@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { repairModule } from "../../../lib/db";
+import { searchAssets } from "../../../lib/repair-api";
 import { AssetWithHistory } from "@zorviz/feature-repair";
 import { Input, Button, Card, CardHeader, CardContent } from "@zorviz/ui";
 import { Search, Plus, Car, Smartphone, Watch } from "lucide-react";
@@ -19,7 +19,7 @@ export function AssetDiscovery() {
             }
             setLoading(true);
             try {
-                const assets = await repairModule.assets.search(query);
+                const assets = await searchAssets(query);
                 setResults(assets);
             } catch (error) {
                 console.error("Search failed", error);
