@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button, Card, CardHeader, CardTitle, CardContent } from "@zorviz/ui";
 import { ArrowLeft, CheckCircle2, AlertTriangle, MinusCircle, FileText, UserCog } from "lucide-react";
 import { formatMoney } from "@zorviz/core";
-import { getOrder, completeItem, markDone, type JobTicket, type InspectionItem } from "../lib/orders-api";
+import { getOrder, completeItem, markDone, billOrder, type JobTicket, type InspectionItem } from "../lib/orders-api";
+import { generateInvoicePdf } from "../lib/invoice-pdf";
 import { StatusBadge } from "../components/status-badge";
 import { EstimateBuilder } from "../features/repair/components/EstimateBuilder";
 import { ApprovalDialog } from "../features/repair/components/ApprovalDialog";
@@ -25,7 +26,8 @@ const INSPECTION_ICON: Record<InspectionItem["status"], typeof CheckCircle2> = {
 export default function JobTicketPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const currency = useAppConfigStore((s) => s.config?.currency_symbol ?? "");
+    const config = useAppConfigStore((s) => s.config);
+    const currency = config?.currency_symbol ?? "";
     const [ticket, setTicket] = useState<JobTicket | null>(null);
     const [error, setError] = useState("");
     const [estimateOpen, setEstimateOpen] = useState(false);
@@ -43,6 +45,14 @@ export default function JobTicketPage() {
         if (!ticket) return;
         try {
             setTicket(await markDone(ticket.id));
+        } catch (e) {
+            console.error(e);
+        }
+    };
+    const markPaid = async () => {
+        if (!ticket) return;
+        try {
+            setTicket(await billOrder(ticket.id));
         } catch (e) {
             console.error(e);
         }
@@ -225,6 +235,30 @@ export default function JobTicketPage() {
                                     </CardContent>
                                 </Card>
                             )}
+
+                        {(ticket.status === "done" || ticket.status === "paid") && (
+                            <Card>
+                                <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                                    <CardTitle className="text-sm">Billing</CardTitle>
+                                    <span className="text-lg font-semibold">{formatMoney(ticket.total, currency)}</span>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {ticket.receipt_number && (
+                                        <div className="text-sm text-muted-foreground">Receipt {ticket.receipt_number}</div>
+                                    )}
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" className="flex-1" onClick={() => generateInvoicePdf(ticket, config)}>
+                                            <FileText className="h-4 w-4 mr-1" /> Invoice PDF
+                                        </Button>
+                                        {ticket.status === "done" && (
+                                            <Button className="flex-1" onClick={markPaid}>
+                                                Mark as Paid
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
                         <EstimateBuilder
                             ticket={ticket}

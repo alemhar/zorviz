@@ -700,3 +700,47 @@ pub async fn mark_done(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
 }
+
+/// POST /api/orders/:id/bill — assign a receipt number (once) and mark `paid`. Auth required.
+pub async fn bill_order(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, StatusCode> {
+    if session_from_headers(&state, &headers).is_none() {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Reuse an existing receipt number if this order was already billed.
+    let existing: Option<String> = sqlx::query("SELECT receipt_number FROM orders WHERE id = ? LIMIT 1")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|r| r.try_get::<Option<String>, _>("receipt_number").ok())
+        .flatten();
+
+    let receipt = match existing {
+        Some(r) => r,
+        None => {
+            let n: i64 = sqlx::query("SELECT COUNT(*) AS c FROM orders WHERE receipt_number IS NOT NULL")
+                .fetch_one(&state.pool)
+                .await
+                .ok()
+                .and_then(|r| r.try_get::<i64, _>("c").ok())
+                .unwrap_or(0);
+            format!("INV-{:05}", n + 1)
+        }
+    };
+
+    sqlx::query("UPDATE orders SET receipt_number = ?, status = 'paid', updated_at = ? WHERE id = ?")
+        .bind(&receipt)
+        .bind(now_ms())
+        .bind(&id)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
+}

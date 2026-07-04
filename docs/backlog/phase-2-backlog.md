@@ -40,22 +40,6 @@ No update or delete operations exist in `AssetRepository`. Required for correcti
 
 ---
 
-## BACK-2-009 · Job Ticket — Completion & Invoice
-
-**Priority:** 🟡 Medium  
-**Area:** `apps/desktop/src/features/repair/`  
-**Description:**  
-After work is done, the advisor generates an invoice and marks the ticket as paid.
-
-**Acceptance Criteria:**
-- [ ] "Generate Invoice" button on a DONE ticket
-- [ ] Invoice preview shows: shop name (from app_config), asset info, customer, line items, subtotal, tax, total
-- [ ] "Mark as Paid" button sets `orders.status = 'billed'`
-- [ ] Invoice printable (Tauri print dialog or PDF export)
-- [ ] Receipt number auto-generated (sequential or UUID-based)
-
----
-
 ## BACK-2-010 · Booking CRUD
 
 **Priority:** 🟢 Low  

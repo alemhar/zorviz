@@ -219,3 +219,31 @@ per Plan.txt. Data access via HTTP API (D23).
 - `apps/desktop/src/pages/job-ticket.tsx`, `apps/desktop/src/App.tsx`, `apps/desktop/src/pages/dashboard.tsx`
 
 ---
+
+## ✅ BACK-2-C009 · Job Ticket — Completion & Invoice
+
+**Completed:** 2026-07-04 — **completes the core repair loop**
+**Original Backlog ID:** BACK-2-009
+
+**What was implemented:**
+- Rust `POST /api/orders/:id/bill` — assigns a sequential receipt number (`INV-00001`, …) once (idempotent —
+  re-billing keeps the same number) and sets status `paid`.
+- **PDF invoice** (`lib/invoice-pdf.ts`, jsPDF): shop header from `app_config` (name, address, contact, tax
+  ID, custom fields), invoice #/date, bill-to customer, asset, line-item table, subtotal/discount/tax/total
+  (all formatted from centavos). Downloads as `invoice-<receipt|id>.pdf`.
+- Job ticket **Billing card** (shown when done/paid): total, receipt number, "Invoice PDF" download, and
+  "Mark as Paid" (done → paid).
+
+**Verification:** cargo check + vite build clean; curl — bill → `paid` + `INV-00001`, total 33600 (30000 +12%),
+re-bill idempotent; Playwright **full end-to-end loop** (login → ticket → estimate → approve → assign → check
+→ Mark as Done → **download invoice PDF** → **Mark as Paid** → receipt shown), zero console errors.
+
+**⚠️ Per D9 (intentional):** PDF export (jsPDF file), not the system print dialog. Status is `paid` (the
+canonical D19 flow), not the original spec's `billed`.
+
+**Key files:**
+- `apps/desktop/src-tauri/src/api_data.rs`, `apps/desktop/src-tauri/src/server.rs`
+- `apps/desktop/src/lib/invoice-pdf.ts` (new), `apps/desktop/src/lib/orders-api.ts`, `apps/desktop/src/pages/job-ticket.tsx`
+- `apps/desktop/package.json` (jspdf)
+
+---

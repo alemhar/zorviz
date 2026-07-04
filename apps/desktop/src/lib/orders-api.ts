@@ -26,6 +26,7 @@ export interface JobTicket {
     status: OrderStatus;
     customer_complaint: string | null;
     inspection: InspectionItem[] | null;
+    receipt_number: string | null;
     subtotal: number;
     tax: number;
     discount: number;
@@ -85,6 +86,10 @@ export function completeItem(itemId: string, completed: boolean): Promise<JobTic
 
 export function markDone(orderId: string): Promise<JobTicket> {
     return api.post<JobTicket>(`/api/orders/${orderId}/done`);
+}
+
+export function billOrder(orderId: string): Promise<JobTicket> {
+    return api.post<JobTicket>(`/api/orders/${orderId}/bill`);
 }
 
 export function createOrder(input: {
