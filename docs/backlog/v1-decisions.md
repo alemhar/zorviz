@@ -210,6 +210,40 @@ online/remote dashboard (Phase 4, e.g. BACK-4-006). `admin` remains the on-site 
 - Added to the type now so data/roles are forward-compatible; no DB constraint change (role is TEXT).
 - **Resolved:** the setup wizard's first account stays `admin` (full local control). The `owner` role is
   assigned later via user management (BACK-0-007) and is primarily meaningful for the future online phase.
+
+## D23 — Data architecture: single shared Rust/axum HTTP API
+
+**Decision:** ✅ **Single path.** All clients — the desktop Tauri app AND LAN mobile/tablet browsers — talk
+to ONE typed HTTP API served by the Rust/axum server. Business logic (present + future) lives in **Rust**;
+React/TypeScript remains the UI on every device. **No Node runtime** (evaluated, excluded).
+
+**Why:** the owner wants the full app (not just mechanics) usable on tablets over LAN. Advisor/admin logic
+must therefore be reachable over HTTP, which rules out keeping logic in the desktop-only TS/`invoke` path.
+Chosen now because almost no business logic exists yet — cheapest moment to centralize it in Rust.
+
+**Access model:**
+- **Desktop** (Commander Tauri app): admin + advisor log in.
+- **Mobile / tablet** (LAN browser → axum): admin + advisor + mechanic log in.
+
+**Consequences / migration:**
+- Auth moves **server-side**: a phone can't `invoke`, and client-side PIN checks are bypassable. Rust
+  verifies username+PIN (PBKDF2, same params as `crypto.ts`) and issues a session token; middleware guards
+  routes by role. The login *form* and PIN/PBKDF2 *scheme* carry over; verification location changes.
+- The existing TS data access (Kysely-via-`invoke`: `AssetRepository`, auth/app-config stores, wizard
+  inserts) migrates to `fetch` against the API. `execute_sql` (raw SQL over `invoke`) is retired once
+  nothing uses it, and is **never** exposed over the network.
+- Feature velocity note: remaining v1 features (orders, estimates, inventory, invoicing) get written as
+  Rust endpoints. Slower per-feature than TS, but write-once for all devices. Owner accepted this.
+
+**Kept from prior work (per reusability review):** schema, money/core helpers, all React UI (wizard/login/
+dashboard), username+PIN model + PBKDF2 scheme. ~80% of BACK-0-003/004 carries over; the ~20% rewire (data
+transport + server-side auth) is the substance of BACK-0-005.
+
+**BACK-0-005 increment plan:**
+1. Rust auth foundation — PBKDF2 verify in Rust, `POST /api/login` + opaque session tokens + auth/role middleware, `GET /api/me`; rewire the auth store to `fetch`.
+2. LAN serving + hardening — axum serves the built frontend over LAN; CORS locked to app origins (no wildcard); Windows Firewall rule for port 3030; verify phone can load + log in.
+3. First data endpoints — migrate assets (search/create) to typed endpoints; establish the pattern; rewire the repair page.
+4. Retire `execute_sql`/`invoke` data path once features are migrated.
 - Requires a **license-generation tool on the owner's side** to create + sign licenses per sale.
 
 **⚠️ Timeline note:** Owner chose "include in v1" over "fast-follow" (my recommendation was fast-follow).

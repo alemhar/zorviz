@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { db } from "../lib/db";
-import { verifyPin } from "../lib/crypto";
+import { api, ApiError, setAuthToken, setUnauthorizedHandler } from "../lib/api";
 import type { UserRole } from "@zorviz/db";
 
 interface User {
@@ -11,71 +10,63 @@ interface User {
     role: UserRole;
 }
 
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 30_000;
+interface LoginResponse {
+    token: string;
+    user: User;
+}
 
 interface AuthState {
     user: User | null;
+    token: string | null;
     isAuthenticated: boolean;
-    failedAttempts: number;
-    lockedUntil: number | null;
     login: (username: string, pin: string) => Promise<void>;
     logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
     persist(
-        (set, get) => ({
+        (set) => ({
             user: null,
+            token: null,
             isAuthenticated: false,
-            failedAttempts: 0,
-            lockedUntil: null,
             login: async (username, pin) => {
-                const lockedUntil = get().lockedUntil;
-                if (lockedUntil && Date.now() < lockedUntil) {
-                    const secs = Math.ceil((lockedUntil - Date.now()) / 1000);
-                    throw new Error(`Too many attempts. Try again in ${secs}s.`);
-                }
-
-                const record = await db
-                    .selectFrom("users")
-                    .select(["id", "name", "username", "role", "pin_hash", "pin_salt", "is_active"])
-                    .where("username", "=", username.trim())
-                    .limit(1)
-                    .executeTakeFirst();
-
-                const ok =
-                    !!record &&
-                    record.is_active === 1 &&
-                    (await verifyPin(pin, record.pin_hash, record.pin_salt));
-
-                if (!ok) {
-                    const attempts = get().failedAttempts + 1;
-                    const shouldLock = attempts >= MAX_ATTEMPTS;
-                    set({
-                        failedAttempts: shouldLock ? 0 : attempts,
-                        lockedUntil: shouldLock ? Date.now() + LOCKOUT_MS : get().lockedUntil,
+                try {
+                    const res = await api.post<LoginResponse>("/api/login", {
+                        username: username.trim(),
+                        pin,
                     });
-                    throw new Error("Invalid username or PIN.");
+                    setAuthToken(res.token);
+                    set({ user: res.user, token: res.token, isAuthenticated: true });
+                } catch (e) {
+                    if (e instanceof ApiError) {
+                        throw new Error(e.message || "Login failed.");
+                    }
+                    throw new Error("Could not reach the server.");
                 }
-
-                set({
-                    user: {
-                        id: record.id,
-                        name: record.name,
-                        username: record.username,
-                        role: record.role,
-                    },
-                    isAuthenticated: true,
-                    failedAttempts: 0,
-                    lockedUntil: null,
-                });
             },
-            logout: () => set({ user: null, isAuthenticated: false }),
+            logout: () => {
+                // Best-effort server-side session teardown; ignore failures.
+                api.post("/api/logout").catch(() => {});
+                setAuthToken(null);
+                set({ user: null, token: null, isAuthenticated: false });
+            },
         }),
         {
             name: "auth-storage",
-            partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+            partialize: (state) => ({
+                user: state.user,
+                token: state.token,
+                isAuthenticated: state.isAuthenticated,
+            }),
+            onRehydrateStorage: () => (state) => {
+                // Re-arm the API client with the persisted token after a reload.
+                if (state?.token) setAuthToken(state.token);
+            },
         }
     )
 );
+
+// A 401 from any API call (expired/lost session) forces a clean logout.
+setUnauthorizedHandler(() => {
+    useAuthStore.getState().logout();
+});

@@ -19,18 +19,28 @@ See the **Critical Path to v1** in [`README.md`](./README.md) for the full cross
 **Description:**
 Mechanics work from phones over LAN, which browsers cannot do via `invoke('execute_sql')`. Build a real
 HTTP API on the existing axum server (typed CRUD endpoints — NOT raw SQL over HTTP) and serve a
-mobile-friendly frontend over LAN. **Design decision to resolve first:** whether the desktop webview
-also consumes this same HTTP API (single data path) or keeps the Tauri `invoke` path (dual path).
+mobile-friendly frontend over LAN. **Architecture RESOLVED (D23): single path** — one Rust/axum HTTP API
+for desktop + all LAN devices; business logic in Rust; no Node. Access model: desktop = admin/advisor;
+mobile = admin/advisor/mechanic. Built in the 4 increments listed in D23.
+
+**Progress:**
+- ✅ **Increment 1 (auth foundation) — done 2026-07-04.** Rust `auth.rs`: PBKDF2 verify (matches
+  `crypto.ts`), in-memory sessions w/ 12h opaque bearer tokens, 5-attempt/30s lockout; `POST /api/login`,
+  `POST /api/logout`, `GET /api/me`. Frontend `api.ts` client (base-URL detection + 401→logout); auth store
+  rewired from client-side Kysely/`verifyPin` to the API. Verified live: login `admin/1234` → token, `/api/me`
+  resolves, wrong-PIN + no-token → 401. Cross-runtime PBKDF2 parity (node seeder ↔ Rust) confirmed.
+- ⏳ Increment 2 — LAN serving + CORS lockdown + firewall; Increment 3 — data endpoints (assets first) +
+  migrate off `invoke`; Increment 4 — retire `execute_sql`.
 
 **Acceptance Criteria:**
-- [ ] Architecture decision recorded: single (HTTP for both) vs dual (invoke + HTTP) data path
+- [x] Architecture decision recorded: **single path** (D23)
+- [~] LAN session auth: token sessions + role data done (Increment 1); login *from a phone browser* pending Increment 2 *(D15)*
 - [ ] axum exposes authenticated REST endpoints for the entities mechanics need (jobs/orders, assets,
-      order_items, customers) — no generic raw-SQL endpoint exposed to the network
-- [ ] LAN session auth: login from a phone browser, token/cookie sessions, role-scoped access *(D15)*
-- [ ] Built frontend (or a dedicated mobile view) served over LAN from the axum server
+      order_items, customers) — no generic raw-SQL endpoint exposed to the network *(Increment 3)*
+- [ ] Built frontend (or a dedicated mobile view) served over LAN from the axum server *(Increment 2)*
 - [ ] All mechanic-facing views mobile-first: ≥44px touch targets, ~430px layout *(Plan.txt)*
-- [ ] Server binds to LAN IP (already partially done); reachable from a phone on the same network
-- [ ] Basic hardening: no CORS wildcard to the world, input validation on every endpoint
+- [ ] Server binds to LAN IP (already partially done); reachable from a phone on the same network *(Increment 2)*
+- [ ] Basic hardening: no CORS wildcard to the world, input validation on every endpoint *(Increment 2)*
 
 ---
 

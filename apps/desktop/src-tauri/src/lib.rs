@@ -4,6 +4,7 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+pub mod auth;
 pub mod db;
 pub mod server;
 
@@ -19,9 +20,9 @@ pub fn run() {
             let handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
                 let pool = db::init_db(&handle).await.expect("failed to init db");
-                handle.manage(db::DbState { pool });
-                // Start local HTTP server
-                server::start_server(handle.clone()).await;
+                handle.manage(db::DbState { pool: pool.clone() });
+                // Start local HTTP server (shared API for desktop + LAN devices)
+                server::start_server(handle.clone(), pool).await;
             });
             Ok(())
         })
