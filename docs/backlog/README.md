@@ -27,7 +27,7 @@
 
 | Phase | Backlog | Completed | Progress |
 |---|---|---|---|
-| Phase 0 — v1 Ship Blockers & Foundation | [backlog](./phase-0-ship-blockers.md) | [completed](./phase-0-completed.md) | ~65% (7 of 13 ✅ incl. licensing + LAN; remaining: user mgmt, backup, dashboard stats, logo, online-enforcement[deferred]) |
+| Phase 0 — v1 Ship Blockers & Foundation | [backlog](./phase-0-ship-blockers.md) | [completed](./phase-0-completed.md) | ~73% (8 of 13 ✅ incl. licensing, LAN, backup; remaining: user mgmt, dashboard stats, logo, online-enforcement[deferred]) |
 | Phase 1 — Core Kernel | [backlog](./phase-1-backlog.md) | [completed](./phase-1-completed.md) | ~70% (5 items remaining) |
 | Phase 2 — Repair Module | [backlog](./phase-2-backlog.md) | [completed](./phase-2-completed.md) | ~80% (**full core loop intake→…→invoice→paid working**; remaining: asset detail/history, bookings, photos) |
 | Phase 3 — Commerce Module | [backlog](./phase-3-backlog.md) | [completed](./phase-3-completed.md) | ~15% (inventory search/create + part-link done via estimate; mgmt page + stock deduction remain) |
@@ -67,8 +67,8 @@ starting the next. Items marked *(mod)* have changed scope vs their original bac
 18. ~~**BACK-2-007** — Mechanic "My Jobs" mobile view~~ ✅ **Done** (2026-07-04 — job board + checklist execution → done)
 19. ~~**BACK-2-009** — Completion & invoice~~ ✅ **Done** (2026-07-04 — PDF invoice + receipt + mark paid; **core loop complete**)
 20. **BACK-2-010** — Bookings *(mod: unified with walk-ins; converges at the same Create Job Ticket screen — D10)*
-21. **BACK-0-007** — Minimal user management
-22. **BACK-0-008** — Backup & restore *(only safety net with cloud deferred)*
+21. **BACK-0-007** — Minimal user management *(← NEXT)*
+22. ~~**BACK-0-008** — Backup & restore~~ ✅ **Done** (2026-07-04 — VACUUM INTO backups, auto+manual, staged restore, retention)
 
 ### Tier P2 — Ship polish
 23. **BACK-0-011** — Real dashboard stats *(replace hardcoded numbers)*

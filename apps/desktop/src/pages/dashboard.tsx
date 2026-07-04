@@ -1,15 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
 import { Button, ThemeSwitcher } from "@zorviz/ui";
 import { useNavigate } from "react-router-dom";
 import { ServerStatus } from "../components/server-status";
-import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp } from "lucide-react";
+import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp, DatabaseBackup } from "lucide-react";
+import { BackupDialog } from "../features/backup/BackupDialog";
 
 export default function DashboardPage() {
     const { user, logout } = useAuthStore();
     const { config, fetchConfig } = useAppConfigStore();
     const navigate = useNavigate();
+    const [backupOpen, setBackupOpen] = useState(false);
 
     useEffect(() => {
         fetchConfig();
@@ -146,12 +148,23 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Theme Switcher */}
-                <div className="border rounded-xl p-6 bg-card max-w-sm">
-                    <h3 className="font-semibold mb-4">Appearance</h3>
-                    <ThemeSwitcher />
+                {/* Appearance + Data */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                    <div className="border rounded-xl p-6 bg-card">
+                        <h3 className="font-semibold mb-4">Appearance</h3>
+                        <ThemeSwitcher />
+                    </div>
+                    <div className="border rounded-xl p-6 bg-card">
+                        <h3 className="font-semibold mb-2">Data</h3>
+                        <p className="text-sm text-muted-foreground mb-4">Back up your shop's data or restore from a backup.</p>
+                        <Button variant="outline" onClick={() => setBackupOpen(true)}>
+                            <DatabaseBackup className="w-4 h-4 mr-2" /> Backup &amp; Restore
+                        </Button>
+                    </div>
                 </div>
             </main>
+
+            <BackupDialog open={backupOpen} onOpenChange={setBackupOpen} />
         </div>
     );
 }

@@ -1,6 +1,6 @@
 # Phase 0 Backlog — v1 Ship Blockers & Foundation
 
-> **Status:** In progress — 7 of 13 complete (BACK-0-001, 002, 003, 004, 006, 009, 010 ✅) + BACK-0-005 increments 1–3 (LAN, phone-verified). Remaining: BACK-0-007 (user mgmt), 008 (backup), 011 (dashboard stats), 012 (online enforcement — deferred), 013 (logo upload).
+> **Status:** In progress — 8 of 13 complete (BACK-0-001, 002, 003, 004, 006, 008, 009, 010 ✅) + BACK-0-005 increments 1–3 (LAN, phone-verified). Remaining: BACK-0-007 (user mgmt), 011 (dashboard stats), 013 (logo upload), 012 (online enforcement — deferred).
 > **Scope:** Foundation fixes and new cross-cutting infrastructure required before Zorviz can ship a
 > usable v1 to a real shop. Derived from the plan/design audit (2026-07-04) and owner decisions in
 > [`v1-decisions.md`](./v1-decisions.md).
@@ -75,23 +75,6 @@ phones. Minimal CRUD.
 - [ ] Add user: name, role (admin/advisor/mechanic), username, initial PIN
 - [ ] Reset PIN / deactivate user
 - [ ] Uses the customers/users tables via Kysely (no raw SQL)
-
----
-
-## BACK-0-008 · Backup & Restore (Local)
-
-**Priority:** 🟡 P1 — only safety net with cloud deferred; non-negotiable for local-first
-**Area:** `apps/desktop/src-tauri/` (fs), settings/dashboard UI
-**Traces to:** D18, D2
-**Description:**
-A disk failure or stolen PC otherwise loses all shop data. Local backup with auto + manual triggers.
-
-**Acceptance Criteria:**
-- [ ] "Backup now" button (manual)
-- [ ] Automatic date-stamped copy of the SQLite DB **and** logo/media files on app launch
-- [ ] Backup target folder is shop-configurable (USB/second disk/network folder)
-- [ ] "Restore from backup" flow (with confirmation — it overwrites current data)
-- [ ] Rolling retention (keep last N backups; don't fill the disk)
 
 ---
 

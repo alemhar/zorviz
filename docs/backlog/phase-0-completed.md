@@ -6,6 +6,36 @@
 
 ---
 
+## ✅ BACK-0-C008 · Backup & Restore (Local)
+
+**Completed:** 2026-07-04
+**Original Backlog ID:** BACK-0-008
+**Traces to:** D18, D2, D24
+
+**What was implemented:**
+- `src-tauri/src/backup.rs`: consistent single-file backups via SQLite **`VACUUM INTO`** (WAL-safe);
+  date-stamped names (`zorviz-YYYYMMDD-HHMMSS.db`); **rolling retention** (keep last 10, prune older).
+- **Auto-backup on launch** (best-effort, in `lib.rs` after DB init) + **manual** `POST /api/backup`.
+- **Restore is staged, applied on next launch** (`apply_pending_restore` runs *before* the pool opens,
+  in `lib.rs`) — safe with an open DB and **non-destructive**: the live DB is untouched until restart.
+  Path-traversal guarded (rejects names with `/`, `\`, `..`).
+- Backup folder is shop-configurable (`app_config.backup_dir`, migration 0004; null → `<data>/backups`).
+- Backup/restore endpoints are **exempt from the read-only license gate** (D24 — a shop can always
+  export/recover its own data): `POST /api/backup`, `GET /api/backups`, `POST /api/restore`, `POST /api/backup-dir`.
+- UI: `BackupDialog` (folder field, "Back Up Now", list of backups with Restore + restart prompt) from a
+  dashboard **Data** card.
+
+**Verification (curl + Playwright):** auto-backup file present on launch; manual backup creates a file; list
+returns dir + count; restore stages `restore-pending.db` (`restart_required: true`) leaving the live DB intact;
+`../zorviz.db` → 400. UI: dialog opens, "Back Up Now" updates the list — zero console errors.
+
+**Key files:**
+- `packages/db/migrations/sqlite/0004_backup_dir.sql` (new), `packages/db/src/types.ts`
+- `apps/desktop/src-tauri/src/backup.rs` (new), `apps/desktop/src-tauri/src/lib.rs`, `src/api_data.rs`, `src/server.rs`
+- `apps/desktop/src/lib/backup-api.ts` (new), `apps/desktop/src/features/backup/BackupDialog.tsx` (new), `apps/desktop/src/pages/dashboard.tsx`
+
+---
+
 ## ✅ BACK-0-C006 · Signed License + Device Fingerprint + Trial + Gating
 
 **Completed:** 2026-07-04 (2 increments)

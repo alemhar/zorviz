@@ -127,6 +127,10 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
             "/api/license",
             get(api_data::get_license).post(api_data::load_license),
         )
+        .route("/api/backup", post(api_data::backup_now))
+        .route("/api/backups", get(api_data::list_backups))
+        .route("/api/restore", post(api_data::restore_backup))
+        .route("/api/backup-dir", post(api_data::set_backup_dir))
         .route(
             "/api/inventory",
             get(api_data::search_inventory).post(api_data::create_inventory),
@@ -158,7 +162,10 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
 async fn license_gate(req: Request, next: Next) -> Response {
     let mutating = matches!(req.method(), &Method::POST | &Method::PUT | &Method::DELETE | &Method::PATCH);
     let path = req.uri().path();
-    let exempt = matches!(path, "/api/login" | "/api/logout" | "/api/license");
+    // Auth + license install + data-safety ops (backup/restore) are always allowed — even
+    // read-only (D24): the shop can always export/recover its own data.
+    let exempt = matches!(path, "/api/login" | "/api/logout" | "/api/license" | "/api/restore" | "/api/backup-dir")
+        || path.starts_with("/api/backup");
 
     if mutating && path.starts_with("/api/") && !exempt {
         let status = crate::license::read_license_status(&crate::db::data_dir());

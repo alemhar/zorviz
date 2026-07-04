@@ -77,6 +77,7 @@ export interface AppConfigTable {
     logo_path: Nullable<string>;
     tax_registration_id: Nullable<string>;
     custom_fields: Nullable<string>; // JSON: { label: value }
+    backup_dir: Nullable<string>; // backup destination folder (null → <data>/backups)
     created_at: number;
     updated_at: number;
 }
