@@ -91,3 +91,38 @@
 - `packages/ui/src/components/ui/dialog.tsx` (new)
 
 ---
+
+## ✅ BACK-2-C004 · Job Ticket — Create (Intake & Triage)
+
+**Completed:** 2026-07-04
+**Original Backlog ID:** BACK-2-004
+
+**What was implemented:**
+- **Migration 0001** (`0001_orders_intake.sql`) — `ALTER TABLE orders ADD COLUMN inspection TEXT`. First
+  *incremental* migration (the DB now holds real setup/test data; no more squashing 0000_init).
+- Rust `POST /api/orders` — creates a ticket at status `triage`; derives `customer_id` from the asset's
+  owner; stores the inspection checklist as JSON. `GET /api/orders/:id` — returns the ticket with the
+  nested `asset` (specs parsed) and `customer`, and `inspection` parsed to an array.
+- **Intake form** (`IntakeForm.tsx`): launched from a "New Ticket" button on each asset card. Customer
+  complaint (textarea) + a 5-item inspection checklist (OK / Issue / N/A + note on issues). On submit →
+  creates the order → navigates to the ticket detail.
+- **Job ticket detail page** (`pages/job-ticket.tsx`, route `/repair/ticket/:id`): status badge, asset,
+  customer, complaint, inspection results.
+- Reusable `StatusBadge` for the canonical `OrderStatus` flow.
+
+**Verification:** cargo check + vite build clean; migration 0001 applied on existing data on boot (no
+wipe); curl create/detail return `triage` + nested asset/customer + parsed inspection; Playwright UI flow
+(login → search → New Ticket → complaint → Create → ticket detail shows Triage + complaint) passed, zero
+console errors.
+
+**⚠️ Deviations from original spec:** data access is the HTTP API (not a TS `OrderRepository`) per D23;
+**photo upload deferred** (kept as BACK-2-011 — needs Tauri fs, same as the logo BACK-0-013).
+
+**Key files:**
+- `packages/db/migrations/sqlite/0001_orders_intake.sql` (new), `packages/db/src/types.ts`
+- `apps/desktop/src-tauri/src/api_data.rs`, `apps/desktop/src-tauri/src/server.rs`
+- `apps/desktop/src/lib/orders-api.ts` (new), `apps/desktop/src/features/repair/components/IntakeForm.tsx` (new)
+- `apps/desktop/src/pages/job-ticket.tsx` (new), `apps/desktop/src/components/status-badge.tsx` (new)
+- `apps/desktop/src/App.tsx`, `apps/desktop/src/features/repair/components/AssetDiscovery.tsx`
+
+---

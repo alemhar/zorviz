@@ -138,6 +138,7 @@ export interface OrdersTable {
     assigned_mechanic_id: Nullable<string>; // references users(id)
     receipt_number: Nullable<string>; // set at billing
     approval_proof: Nullable<string>; // who + how approved (D5)
+    inspection: Nullable<string>; // JSON: intake inspection checklist
     subtotal: number; // centavos
     tax: number; // centavos
     discount: number; // centavos

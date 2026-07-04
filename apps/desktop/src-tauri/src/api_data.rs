@@ -4,7 +4,7 @@
 // never raw SQL over the network.
 
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
@@ -54,13 +54,18 @@ fn row_to_json(row: &SqliteRow) -> Map<String, Value> {
     map
 }
 
-// Parse a stored `specs` JSON string into a nested object (assets store specs as text).
-fn expand_specs(obj: &mut Map<String, Value>) {
-    if let Some(Value::String(s)) = obj.get("specs") {
+// Parse a stored JSON-string column into a nested object/array in place.
+fn parse_json_field(obj: &mut Map<String, Value>, field: &str) {
+    if let Some(Value::String(s)) = obj.get(field) {
         if let Ok(parsed) = serde_json::from_str::<Value>(s) {
-            obj.insert("specs".to_string(), parsed);
+            obj.insert(field.to_string(), parsed);
         }
     }
+}
+
+// Expand an asset's `specs` (stored as text) and attach an (empty) pendingBookings array.
+fn expand_specs(obj: &mut Map<String, Value>) {
+    parse_json_field(obj, "specs");
     obj.insert("pendingBookings".to_string(), json!([]));
 }
 
@@ -229,4 +234,105 @@ pub async fn create_asset(
     let mut obj = row_to_json(&row);
     expand_specs(&mut obj);
     Ok(Json(Value::Object(obj)))
+}
+
+// ---- Job tickets (orders) ----
+
+#[derive(Deserialize)]
+pub struct CreateOrderReq {
+    asset_id: String,
+    customer_complaint: Option<String>,
+    inspection: Option<Value>,
+}
+
+/// POST /api/orders — create a job ticket at status `triage`. Auth required.
+/// customer_id is derived from the asset's owner.
+pub async fn create_order(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(req): Json<CreateOrderReq>,
+) -> Result<Json<Value>, StatusCode> {
+    if session_from_headers(&state, &headers).is_none() {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Derive customer from the asset's owner.
+    let customer_id: Option<String> = sqlx::query("SELECT owner_id FROM assets WHERE id = ? LIMIT 1")
+        .bind(&req.asset_id)
+        .fetch_optional(&state.pool)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|r| r.try_get::<Option<String>, _>("owner_id").ok())
+        .flatten();
+
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = now_ms();
+    let inspection_str = req.inspection.as_ref().map(|v| v.to_string());
+
+    sqlx::query(
+        "INSERT INTO orders (id, asset_id, customer_id, status, customer_complaint, inspection, \
+         subtotal, tax, discount, total, created_at, updated_at) \
+         VALUES (?, ?, ?, 'triage', ?, ?, 0, 0, 0, 0, ?, ?)",
+    )
+    .bind(&id)
+    .bind(&req.asset_id)
+    .bind(&customer_id)
+    .bind(&req.customer_complaint)
+    .bind(&inspection_str)
+    .bind(now)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    order_detail(&state, &id).await.ok_or(StatusCode::INTERNAL_SERVER_ERROR).map(Json)
+}
+
+/// GET /api/orders/:id — a job ticket with its asset and customer embedded. Auth required.
+pub async fn get_order(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, StatusCode> {
+    if session_from_headers(&state, &headers).is_none() {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
+}
+
+// Build a job-ticket detail object: order fields (inspection parsed) + nested asset + customer.
+async fn order_detail(state: &ApiState, id: &str) -> Option<Value> {
+    let row = sqlx::query("SELECT * FROM orders WHERE id = ? LIMIT 1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await
+        .ok()
+        .flatten()?;
+    let mut obj = row_to_json(&row);
+    parse_json_field(&mut obj, "inspection");
+
+    if let Some(asset_id) = obj.get("asset_id").and_then(|v| v.as_str()).map(String::from) {
+        if let Ok(Some(arow)) = sqlx::query("SELECT * FROM assets WHERE id = ? LIMIT 1")
+            .bind(&asset_id)
+            .fetch_optional(&state.pool)
+            .await
+        {
+            let mut a = row_to_json(&arow);
+            parse_json_field(&mut a, "specs");
+            obj.insert("asset".to_string(), Value::Object(a));
+        }
+    }
+
+    if let Some(customer_id) = obj.get("customer_id").and_then(|v| v.as_str()).map(String::from) {
+        if let Ok(Some(crow)) = sqlx::query("SELECT * FROM customers WHERE id = ? LIMIT 1")
+            .bind(&customer_id)
+            .fetch_optional(&state.pool)
+            .await
+        {
+            obj.insert("customer".to_string(), Value::Object(row_to_json(&crow)));
+        }
+    }
+
+    Some(Value::Object(obj))
 }

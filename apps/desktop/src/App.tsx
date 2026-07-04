@@ -7,6 +7,7 @@ import SetupPage from "./pages/setup";
 import LoginPage from "./pages/login";
 import DashboardPage from "./pages/dashboard";
 import RepairPage from "./pages/repair";
+import JobTicketPage from "./pages/job-ticket";
 import "@zorviz/ui/src/styles.css";
 
 function App() {
@@ -44,6 +45,10 @@ function App() {
                 <Route
                   path="/repair"
                   element={isAuthenticated ? <RepairPage /> : <Navigate to="/login" />}
+                />
+                <Route
+                  path="/repair/ticket/:id"
+                  element={isAuthenticated ? <JobTicketPage /> : <Navigate to="/login" />}
                 />
                 <Route path="*" element={<Navigate to="/" />} />
               </>

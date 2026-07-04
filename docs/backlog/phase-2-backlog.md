@@ -40,26 +40,6 @@ No update or delete operations exist in `AssetRepository`. Required for correcti
 
 ---
 
-## BACK-2-004 · Job Ticket — Create (Intake & Triage)
-
-**Priority:** 🔴 High  
-**Area:** `packages/features/repair/src/dal/`, `apps/desktop/src/features/repair/`  
-**Description:**  
-Core of the repair module. After selecting an asset, the advisor/mechanic creates a Job Ticket capturing the intake information.
-
-**Acceptance Criteria:**
-- [ ] `OrderRepository` created in `packages/features/repair/src/dal/order.repo.ts`
-  - `create(input: CreateOrderInput): Promise<Order>` — inserts into `orders` with status `triage`
-- [ ] `RepairModule` exposes `orders: OrderRepository`
-- [ ] Intake form UI:
-  - Customer complaint (free text)
-  - Initial inspection checklist (at minimum 5 preset items with pass/fail/note)
-  - Photo upload (stored as local file paths, not blobs)
-- [ ] On submit: new `Order` row created, user navigated to Job Ticket detail
-- [ ] Job Ticket status badge shows `TRIAGE`
-
----
-
 ## BACK-2-005 · Job Ticket — Estimation (Advisor)
 
 **Priority:** 🔴 High  

@@ -3,14 +3,16 @@ import { useState, useEffect } from "react";
 import { searchAssets } from "../../../lib/repair-api";
 import { AssetWithHistory } from "@zorviz/feature-repair";
 import { Input, Button, Card, CardHeader, CardContent } from "@zorviz/ui";
-import { Search, Plus, Car, Smartphone, Watch } from "lucide-react";
+import { Search, Plus, Car, Smartphone, Watch, ClipboardList } from "lucide-react";
 import { AssetCreateForm } from "./AssetCreateForm";
+import { IntakeForm } from "./IntakeForm";
 
 export function AssetDiscovery() {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<AssetWithHistory[]>([]);
     const [loading, setLoading] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
+    const [intakeAsset, setIntakeAsset] = useState<AssetWithHistory | null>(null);
 
     // Debounced search (simplified)
     useEffect(() => {
@@ -80,8 +82,13 @@ export function AssetDiscovery() {
                             <div className="text-sm text-muted-foreground">
                                 {(asset.specs as any).make} {(asset.specs as any).model}
                             </div>
-                            <div className="text-xs text-muted-foreground mt-2">
-                                Last Visit: {asset.lastVisit ? new Date(asset.lastVisit).toLocaleDateString() : 'Never'}
+                            <div className="flex items-center justify-between mt-2">
+                                <div className="text-xs text-muted-foreground">
+                                    Last Visit: {asset.lastVisit ? new Date(asset.lastVisit).toLocaleDateString() : 'Never'}
+                                </div>
+                                <Button size="sm" variant="outline" onClick={() => setIntakeAsset(asset)}>
+                                    <ClipboardList className="h-4 w-4 mr-1" /> New Ticket
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>
@@ -98,6 +105,12 @@ export function AssetDiscovery() {
                 open={createOpen}
                 onOpenChange={setCreateOpen}
                 onCreated={(asset) => setResults((prev) => [asset, ...prev.filter((a) => a.id !== asset.id)])}
+            />
+
+            <IntakeForm
+                asset={intakeAsset}
+                open={intakeAsset !== null}
+                onOpenChange={(o) => { if (!o) setIntakeAsset(null); }}
             />
         </div>
     );
