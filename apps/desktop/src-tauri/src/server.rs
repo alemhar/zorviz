@@ -1,18 +1,22 @@
 use axum::{
+    body::Body,
+    http::{header, HeaderValue, StatusCode, Uri},
+    response::{IntoResponse, Response},
     routing::{get, post},
-    Router,
-    response::Html,
-    Json,
+    Json, Router,
 };
+use local_ip_address::local_ip;
+use rust_embed::RustEmbed;
 use serde_json::{json, Value};
+use sqlx::{Pool, Sqlite};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
-use local_ip_address::local_ip;
-use sqlx::{Pool, Sqlite};
 use tauri::{AppHandle, Emitter, Manager, State};
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use crate::auth::{self, ApiState, AuthState};
+
+const PORT: u16 = 3030;
 
 pub struct ServerState {
     pub url: Mutex<Option<String>>,
@@ -23,13 +27,60 @@ pub fn get_server_url(state: State<ServerState>) -> Option<String> {
     state.url.lock().unwrap().clone()
 }
 
+// The built React frontend (apps/desktop/dist). In debug builds rust-embed reads these
+// from disk at runtime; in release they are embedded into the binary so the axum server
+// can serve the SPA to LAN devices with no external files.
+#[derive(RustEmbed)]
+#[folder = "../dist"]
+struct Assets;
+
+fn serve_embedded(path: &str) -> Option<Response> {
+    let file = Assets::get(path)?;
+    let mime = mime_guess::from_path(path).first_or_octet_stream();
+    let mut resp = Response::new(Body::from(file.data.into_owned()));
+    if let Ok(value) = HeaderValue::from_str(mime.as_ref()) {
+        resp.headers_mut().insert(header::CONTENT_TYPE, value);
+    }
+    Some(resp)
+}
+
+// Serve static assets; fall back to index.html (the app uses HashRouter, so all client
+// routes live under `/`).
+async fn static_handler(uri: Uri) -> Response {
+    let path = uri.path().trim_start_matches('/');
+    let path = if path.is_empty() { "index.html" } else { path };
+    serve_embedded(path)
+        .or_else(|| serve_embedded("index.html"))
+        .unwrap_or_else(|| (StatusCode::NOT_FOUND, "Not found").into_response())
+}
+
+// Allow only the desktop webview origins (dev vite server + Tauri's tauri.localhost) to
+// call the API cross-origin. Phones load the SPA from this same server, so they are
+// same-origin and need no CORS. Public origins are rejected (not a wildcard).
+fn cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+            let o = origin.to_str().unwrap_or("");
+            o.contains("tauri.localhost")
+                || o.starts_with("http://localhost")
+                || o.starts_with("http://127.0.0.1")
+        }))
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PUT,
+            axum::http::Method::DELETE,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+}
+
 pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
     let my_local_ip = local_ip().unwrap_or(IpAddr::from([0, 0, 0, 0]));
-    let port = 3030;
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    let url = format!("http://{}:{}", my_local_ip, port);
+    let addr = SocketAddr::from(([0, 0, 0, 0], PORT));
+    let url = format!("http://{}:{}", my_local_ip, PORT);
 
     println!("Attempting to bind HTTP server to {}", addr);
+    ensure_firewall_rule();
 
     if let Some(state) = app.try_state::<ServerState>() {
         *state.url.lock().unwrap() = Some(url.clone());
@@ -40,17 +91,13 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
         auth: Arc::new(AuthState::default()),
     };
 
-    // Increment 1: permissive CORS so the desktop webview (tauri origin) can reach
-    // localhost:3030. Increment 2 (hardening) locks this to specific app origins.
-    let cors = CorsLayer::permissive();
-
     let router = Router::new()
-        .route("/", get(root_handler))
         .route("/api/info", get(info_handler))
         .route("/api/login", post(auth::login))
         .route("/api/logout", post(auth::logout))
         .route("/api/me", get(auth::me))
-        .layer(cors)
+        .fallback(static_handler) // serve the SPA for everything else
+        .layer(cors_layer())
         .with_state(api_state);
 
     tauri::async_runtime::spawn(async move {
@@ -70,10 +117,6 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
     });
 }
 
-async fn root_handler() -> Html<&'static str> {
-    Html("<h1>Zorviz Node</h1><p>Online</p>")
-}
-
 async fn info_handler() -> Json<Value> {
     Json(json!({
         "status": "ok",
@@ -81,3 +124,38 @@ async fn info_handler() -> Json<Value> {
         "version": "0.1.0"
     }))
 }
+
+// Best-effort: open inbound TCP 3030 so LAN devices can reach the server. Succeeds only
+// when the process is elevated (e.g. run once as admin, or added by the installer);
+// otherwise it fails silently and the rule must be added by the installer / manually.
+#[cfg(target_os = "windows")]
+fn ensure_firewall_rule() {
+    use std::process::Command;
+    let name = "Zorviz LAN Server (Port 3030)";
+
+    let already = Command::new("netsh")
+        .args(["advfirewall", "firewall", "show", "rule", &format!("name={}", name)])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("Rule Name"))
+        .unwrap_or(false);
+    if already {
+        return;
+    }
+
+    let _ = Command::new("netsh")
+        .args([
+            "advfirewall",
+            "firewall",
+            "add",
+            "rule",
+            &format!("name={}", name),
+            "dir=in",
+            "action=allow",
+            "protocol=TCP",
+            "localport=3030",
+        ])
+        .output();
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ensure_firewall_rule() {}

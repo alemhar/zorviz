@@ -29,18 +29,24 @@ mobile = admin/advisor/mechanic. Built in the 4 increments listed in D23.
   `POST /api/logout`, `GET /api/me`. Frontend `api.ts` client (base-URL detection + 401→logout); auth store
   rewired from client-side Kysely/`verifyPin` to the API. Verified live: login `admin/1234` → token, `/api/me`
   resolves, wrong-PIN + no-token → 401. Cross-runtime PBKDF2 parity (node seeder ↔ Rust) confirmed.
-- ⏳ Increment 2 — LAN serving + CORS lockdown + firewall; Increment 3 — data endpoints (assets first) +
-  migrate off `invoke`; Increment 4 — retire `execute_sql`.
+- ✅ **Increment 2 (LAN serving + hardening) — done 2026-07-04.** axum serves the built SPA (embedded via
+  rust-embed; disk in debug, in-binary in release) as a fallback under `/`; CORS locked to desktop origins
+  (tauri.localhost + localhost) via predicate — foreign origins rejected, no wildcard; best-effort Windows
+  Firewall rule for TCP 3030 (needs elevation / installer). Verified via curl: `/` serves index.html, JS
+  asset 200, CORS allows tauri origin + rejects evil.example, LAN IP `:3030` serves 200. **Physical-phone
+  end-to-end deferred to after Increment 3** (the phone loads but config/data still use `invoke`; it becomes
+  fully functional once reads move to HTTP).
+- ⏳ Increment 3 — data endpoints (assets/config first) + migrate off `invoke`; Increment 4 — retire `execute_sql`.
 
 **Acceptance Criteria:**
 - [x] Architecture decision recorded: **single path** (D23)
 - [~] LAN session auth: token sessions + role data done (Increment 1); login *from a phone browser* pending Increment 2 *(D15)*
 - [ ] axum exposes authenticated REST endpoints for the entities mechanics need (jobs/orders, assets,
       order_items, customers) — no generic raw-SQL endpoint exposed to the network *(Increment 3)*
-- [ ] Built frontend (or a dedicated mobile view) served over LAN from the axum server *(Increment 2)*
+- [x] Built frontend served over LAN from the axum server *(Increment 2 — embedded SPA)*
 - [ ] All mechanic-facing views mobile-first: ≥44px touch targets, ~430px layout *(Plan.txt)*
-- [ ] Server binds to LAN IP (already partially done); reachable from a phone on the same network *(Increment 2)*
-- [ ] Basic hardening: no CORS wildcard to the world, input validation on every endpoint *(Increment 2)*
+- [x] Server binds to LAN IP; reachable from the network interface *(Increment 2; physical-phone test pending Increment 3)*
+- [~] Basic hardening: CORS locked to app origins (no wildcard) done *(Increment 2)*; per-endpoint input validation ongoing as endpoints are added *(Increment 3)*
 
 ---
 
