@@ -1,68 +1,72 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { db } from "../lib/db";
+import { api, ApiError, setAuthToken, setUnauthorizedHandler } from "../lib/api";
+import type { UserRole } from "@zorviz/db";
 
 interface User {
     id: string;
     name: string;
-    email: string;
-    role: "admin" | "advisor" | "mechanic" | "customer";
+    username: string;
+    role: UserRole;
+}
+
+interface LoginResponse {
+    token: string;
+    user: User;
 }
 
 interface AuthState {
     user: User | null;
+    token: string | null;
     isAuthenticated: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    login: (username: string, pin: string) => Promise<void>;
     logout: () => void;
-}
-
-// Simple hash function using Web Crypto API (browser-compatible)
-async function hashPassword(password: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const useAuthStore = create<AuthState>()(
     persist(
         (set) => ({
             user: null,
+            token: null,
             isAuthenticated: false,
-            login: async (email, password) => {
-                // Kysely query - type-safe and elegant
-                const userRecord = await db
-                    .selectFrom('users')
-                    .select(['id', 'email', 'role', 'password_hash'])
-                    .where('email', '=', email)
-                    .limit(1)
-                    .executeTakeFirst();
-
-                if (!userRecord) {
-                    throw new Error("User not found");
+            login: async (username, pin) => {
+                try {
+                    const res = await api.post<LoginResponse>("/api/login", {
+                        username: username.trim(),
+                        pin,
+                    });
+                    setAuthToken(res.token);
+                    set({ user: res.user, token: res.token, isAuthenticated: true });
+                } catch (e) {
+                    if (e instanceof ApiError) {
+                        throw new Error(e.message || "Login failed.");
+                    }
+                    throw new Error("Could not reach the server.");
                 }
-
-                // Verify password
-                const passwordHash = await hashPassword(password);
-                if (userRecord.password_hash !== passwordHash) {
-                    throw new Error("Invalid password");
-                }
-
-                set({
-                    user: {
-                        id: userRecord.id,
-                        name: email.split('@')[0],
-                        email: userRecord.email,
-                        role: userRecord.role,
-                    },
-                    isAuthenticated: true,
-                });
             },
-            logout: () => set({ user: null, isAuthenticated: false }),
+            logout: () => {
+                // Best-effort server-side session teardown; ignore failures.
+                api.post("/api/logout").catch(() => {});
+                setAuthToken(null);
+                set({ user: null, token: null, isAuthenticated: false });
+            },
         }),
         {
             name: "auth-storage",
+            partialize: (state) => ({
+                user: state.user,
+                token: state.token,
+                isAuthenticated: state.isAuthenticated,
+            }),
+            onRehydrateStorage: () => (state) => {
+                // Re-arm the API client with the persisted token after a reload.
+                if (state?.token) setAuthToken(state.token);
+            },
         }
     )
 );
+
+// A 401 from any API call (expired/lost session) forces a clean logout.
+setUnauthorizedHandler(() => {
+    useAuthStore.getState().logout();
+});

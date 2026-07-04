@@ -4,7 +4,11 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+pub mod api_data;
+pub mod auth;
+pub mod backup;
 pub mod db;
+pub mod license;
 pub mod server;
 
 use tauri::Manager;
@@ -18,10 +22,17 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
+                // Apply a staged restore (if any) BEFORE opening the DB.
+                backup::apply_pending_restore(&db::data_dir());
+
                 let pool = db::init_db(&handle).await.expect("failed to init db");
-                handle.manage(db::DbState { pool });
-                // Start local HTTP server
-                server::start_server(handle.clone()).await;
+                handle.manage(db::DbState { pool: pool.clone() });
+
+                // Auto-backup on launch (best-effort; keeps a rolling set).
+                let _ = backup::backup_now(&pool, &db::data_dir()).await;
+
+                // Start local HTTP server (shared API for desktop + LAN devices)
+                server::start_server(handle.clone(), pool).await;
             });
             Ok(())
         })

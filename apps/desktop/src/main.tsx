@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 
-window.onerror = function (message, source, lineno, colno, error) {
+window.onerror = function (message, source, lineno) {
   const div = document.createElement("div");
   div.style.color = "red";
   div.style.padding = "20px";

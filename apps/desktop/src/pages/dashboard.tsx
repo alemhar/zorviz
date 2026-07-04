@@ -1,18 +1,31 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
 import { Button, ThemeSwitcher } from "@zorviz/ui";
 import { useNavigate } from "react-router-dom";
+import { formatMoney } from "@zorviz/core";
 import { ServerStatus } from "../components/server-status";
-import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp } from "lucide-react";
+import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp, DatabaseBackup, Users } from "lucide-react";
+import { BackupDialog } from "../features/backup/BackupDialog";
+import { api } from "../lib/api";
+
+interface DashboardStats {
+    active_jobs: number;
+    pending_estimates: number;
+    low_stock: number;
+    month_revenue: number;
+}
 
 export default function DashboardPage() {
     const { user, logout } = useAuthStore();
     const { config, fetchConfig } = useAppConfigStore();
     const navigate = useNavigate();
+    const [backupOpen, setBackupOpen] = useState(false);
+    const [stats, setStats] = useState<DashboardStats | null>(null);
 
     useEffect(() => {
         fetchConfig();
+        api.get<DashboardStats>("/api/stats").then(setStats).catch(() => {});
     }, [fetchConfig]);
 
     const handleLogout = () => {
@@ -28,6 +41,22 @@ export default function DashboardPage() {
             href: "/repair",
             color: "from-blue-500 to-blue-600",
         },
+        {
+            title: "My Jobs",
+            description: "Jobs assigned to you",
+            icon: ClipboardList,
+            href: "/jobs",
+            color: "from-amber-500 to-amber-600",
+        },
+        ...(user?.role === "admin" || user?.role === "owner"
+            ? [{
+                title: "Staff",
+                description: "Manage staff logins",
+                icon: Users,
+                href: "/users",
+                color: "from-violet-500 to-violet-600",
+            }]
+            : []),
         {
             title: "Inventory",
             description: "Track parts and stock levels",
@@ -50,11 +79,11 @@ export default function DashboardPage() {
         <div className="min-h-screen bg-background">
             <header className="border-b p-4 flex items-center justify-between bg-card/50 backdrop-blur-sm">
                 <div className="flex items-center gap-4">
-                    <h1 className="font-bold text-xl bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Zorviz</h1>
+                    <h1 className="font-bold text-xl bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">{config?.shop_name || "Zorviz"}</h1>
                     <ServerStatus />
                 </div>
                 <div className="flex items-center gap-4">
-                    <span className="text-sm text-muted-foreground">{user?.email} ({user?.role})</span>
+                    <span className="text-sm text-muted-foreground">{user?.name} ({user?.role})</span>
                     <Button variant="outline" size="sm" onClick={handleLogout}>Logout</Button>
                 </div>
             </header>
@@ -73,7 +102,7 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Active Jobs</p>
-                                <p className="text-2xl font-bold">12</p>
+                                <p className="text-2xl font-bold">{stats?.active_jobs ?? 0}</p>
                             </div>
                         </div>
                     </div>
@@ -84,7 +113,7 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Pending Estimates</p>
-                                <p className="text-2xl font-bold">5</p>
+                                <p className="text-2xl font-bold">{stats?.pending_estimates ?? 0}</p>
                             </div>
                         </div>
                     </div>
@@ -95,7 +124,7 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Low Stock</p>
-                                <p className="text-2xl font-bold text-destructive">3</p>
+                                <p className="text-2xl font-bold text-destructive">{stats?.low_stock ?? 0}</p>
                             </div>
                         </div>
                     </div>
@@ -106,7 +135,7 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">This Month</p>
-                                <p className="text-2xl font-bold">{config?.currency_symbol || '$'}24.5k</p>
+                                <p className="text-2xl font-bold">{formatMoney(stats?.month_revenue ?? 0, config?.currency_symbol ?? "")}</p>
                             </div>
                         </div>
                     </div>
@@ -139,12 +168,23 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Theme Switcher */}
-                <div className="border rounded-xl p-6 bg-card max-w-sm">
-                    <h3 className="font-semibold mb-4">Appearance</h3>
-                    <ThemeSwitcher />
+                {/* Appearance + Data */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                    <div className="border rounded-xl p-6 bg-card">
+                        <h3 className="font-semibold mb-4">Appearance</h3>
+                        <ThemeSwitcher />
+                    </div>
+                    <div className="border rounded-xl p-6 bg-card">
+                        <h3 className="font-semibold mb-2">Data</h3>
+                        <p className="text-sm text-muted-foreground mb-4">Back up your shop's data or restore from a backup.</p>
+                        <Button variant="outline" onClick={() => setBackupOpen(true)}>
+                            <DatabaseBackup className="w-4 h-4 mr-2" /> Backup &amp; Restore
+                        </Button>
+                    </div>
                 </div>
             </main>
+
+            <BackupDialog open={backupOpen} onOpenChange={setBackupOpen} />
         </div>
     );
 }

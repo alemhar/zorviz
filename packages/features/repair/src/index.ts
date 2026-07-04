@@ -8,7 +8,7 @@ export * from './dal/asset.repo';
 export class RepairModule {
     public assets: AssetRepository;
 
-    constructor(private db: Kysely<Database>) {
+    constructor(db: Kysely<Database>) {
         this.assets = new AssetRepository(db);
     }
 }

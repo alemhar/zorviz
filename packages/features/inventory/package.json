@@ -11,10 +11,10 @@
         "@zorviz/core": "*",
         "@zorviz/db": "*",
         "@zorviz/ui": "*",
-        "react": "^18.0.0"
+        "react": "^19.0.0"
     },
     "devDependencies": {
         "typescript": "^5.0.0",
-        "@types/react": "^18.0.0"
+        "@types/react": "^19.0.0"
     }
 }
