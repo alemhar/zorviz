@@ -27,7 +27,7 @@
 
 | Phase | Backlog | Completed | Progress |
 |---|---|---|---|
-| Phase 0 — v1 Ship Blockers & Foundation | [backlog](./phase-0-ship-blockers.md) | [completed](./phase-0-completed.md) | ~50% (6 of 13 ✅ + BACK-0-005 LAN, phone-verified) |
+| Phase 0 — v1 Ship Blockers & Foundation | [backlog](./phase-0-ship-blockers.md) | [completed](./phase-0-completed.md) | ~65% (7 of 13 ✅ incl. licensing + LAN; remaining: user mgmt, backup, dashboard stats, logo, online-enforcement[deferred]) |
 | Phase 1 — Core Kernel | [backlog](./phase-1-backlog.md) | [completed](./phase-1-completed.md) | ~70% (5 items remaining) |
 | Phase 2 — Repair Module | [backlog](./phase-2-backlog.md) | [completed](./phase-2-completed.md) | ~80% (**full core loop intake→…→invoice→paid working**; remaining: asset detail/history, bookings, photos) |
 | Phase 3 — Commerce Module | [backlog](./phase-3-backlog.md) | [completed](./phase-3-completed.md) | ~15% (inventory search/create + part-link done via estimate; mgmt page + stock deduction remain) |
@@ -50,7 +50,7 @@ starting the next. Items marked *(mod)* have changed scope vs their original bac
 3. ~~**BACK-0-003** — First-run setup wizard~~ ✅ **Done** (2026-07-04 — 4-step wizard + setup gating; logo upload split to BACK-0-013)
 4. ~~**BACK-0-004** — Username + PIN authentication~~ ✅ **Done** (2026-07-04 — PBKDF2 PINs + lockout; LAN session binding lands with BACK-0-005)
 5. **BACK-0-005** — Local HTTP API + LAN serving *(← NEXT; largest item; foundation for all mobile views)*
-6. **BACK-0-006** — Signed license + device fingerprint activation *(heavy; owner chose v1 over fast-follow — see D17 timeline note)*
+6. ~~**BACK-0-006** — Signed license + device fingerprint activation~~ ✅ **Done** (2026-07-04 — Ed25519 licenses + fingerprint + trial + read-only gating; licensegen tool)
 
 ### Tier P1 — The core money-making loop + safety
 7. ~~**BACK-0-009** — Inline-create picker pattern~~ ✅ **Done** (2026-07-04 — reusable `EntityPicker`)

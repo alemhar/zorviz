@@ -3,6 +3,8 @@ import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@zorviz/ui";
 import { useAuthStore } from "./stores/auth";
 import { useAppConfigStore } from "./stores/app-config";
+import { useLicenseStore } from "./stores/license";
+import { LicenseArea } from "./components/license-area";
 import SetupPage from "./pages/setup";
 import LoginPage from "./pages/login";
 import DashboardPage from "./pages/dashboard";
@@ -14,10 +16,12 @@ import "@zorviz/ui/src/styles.css";
 function App() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { isChecked, isSetup, fetchConfig } = useAppConfigStore();
+  const fetchLicense = useLicenseStore((s) => s.fetchLicense);
 
   useEffect(() => {
     fetchConfig();
-  }, [fetchConfig]);
+    fetchLicense();
+  }, [fetchConfig, fetchLicense]);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
@@ -26,7 +30,9 @@ function App() {
           Loading…
         </div>
       ) : (
-        <HashRouter>
+        <>
+          {isSetup && <LicenseArea />}
+          <HashRouter>
           <Routes>
             {!isSetup ? (
               <>
@@ -59,7 +65,8 @@ function App() {
               </>
             )}
           </Routes>
-        </HashRouter>
+          </HashRouter>
+        </>
       )}
     </ThemeProvider>
   );

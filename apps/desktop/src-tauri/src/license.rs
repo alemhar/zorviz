@@ -38,14 +38,27 @@ pub struct LicenseFile {
     pub sig: String,  // base64 of the Ed25519 signature over those bytes
 }
 
+// Self-start trial + grace windows (D21). Read-only after grace — never destructive (D24).
+const TRIAL_DAYS: i64 = 90; // ~3 months
+const GRACE_DAYS: i64 = 3;
+const DAY_MS: i64 = 86_400_000;
+const TRIAL_FILE: &str = "trial.json";
+
 #[derive(Serialize)]
 pub struct LicenseStatus {
-    pub state: String, // valid | expired | wrong_device | invalid | missing
+    pub state: String,  // valid | trial | grace | expired | trial_expired | wrong_device | invalid
+    pub access: String, // full | readonly
     pub device_code: String,
     pub shop_name: Option<String>,
     pub modules: Vec<String>,
     pub expires: Option<i64>,
+    pub trial_ends: Option<i64>,
     pub message: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TrialMarker {
+    started_at: i64,
 }
 
 /// Stable per-device code (short) derived from the OS machine id.
@@ -79,93 +92,94 @@ pub fn sign_license(payload: &LicensePayload, priv_b64: &str) -> Result<String, 
 
 // ---- App-side verification ----
 
-fn status(state: &str, fp: &str, msg: &str) -> LicenseStatus {
-    LicenseStatus {
-        state: state.to_string(),
-        device_code: fp.to_string(),
-        shop_name: None,
-        modules: vec![],
-        expires: None,
-        message: Some(msg.to_string()),
-    }
+// Verify the file signature and decode the payload. Err(reason) if malformed/forged.
+fn verify_payload(content: &str) -> Result<LicensePayload, String> {
+    // Tolerate a UTF-8 BOM / surrounding whitespace (files saved by some editors).
+    let content = content.trim_start_matches('\u{feff}').trim();
+    let file: LicenseFile = serde_json::from_str(content).map_err(|_| "Malformed license file".to_string())?;
+    let data = B64.decode(&file.data).map_err(|_| "Bad license encoding".to_string())?;
+    let sig_bytes = B64.decode(&file.sig).map_err(|_| "Bad signature encoding".to_string())?;
+    let vk_bytes = B64.decode(EMBEDDED_PUBLIC_KEY_B64).map_err(|_| "Bad embedded key".to_string())?;
+    let vk_arr: [u8; 32] = vk_bytes.as_slice().try_into().map_err(|_| "Bad embedded key".to_string())?;
+    let vk = VerifyingKey::from_bytes(&vk_arr).map_err(|_| "Bad embedded key".to_string())?;
+    let sig_arr: [u8; 64] = sig_bytes.as_slice().try_into().map_err(|_| "Bad signature".to_string())?;
+    let sig = Signature::from_bytes(&sig_arr);
+    vk.verify(&data, &sig).map_err(|_| "Signature verification failed".to_string())?;
+    serde_json::from_slice(&data).map_err(|_| "Bad payload".to_string())
 }
 
-pub fn verify_license_str(content: &str) -> LicenseStatus {
-    let fp = device_fingerprint();
-    // Tolerate a UTF-8 BOM / surrounding whitespace (e.g. files saved by some editors).
-    let content = content.trim_start_matches('\u{feff}').trim();
-
-    let file: LicenseFile = match serde_json::from_str(content) {
-        Ok(f) => f,
-        Err(_) => return status("invalid", &fp, "Malformed license file"),
-    };
-    let (data, sig_bytes, vk_bytes) = match (
-        B64.decode(&file.data),
-        B64.decode(&file.sig),
-        B64.decode(EMBEDDED_PUBLIC_KEY_B64),
-    ) {
-        (Ok(d), Ok(s), Ok(v)) => (d, s, v),
-        _ => return status("invalid", &fp, "Bad license encoding"),
-    };
-    let vk_arr: [u8; 32] = match vk_bytes.as_slice().try_into() {
-        Ok(a) => a,
-        Err(_) => return status("invalid", &fp, "Bad embedded key"),
-    };
-    let vk = match VerifyingKey::from_bytes(&vk_arr) {
-        Ok(v) => v,
-        Err(_) => return status("invalid", &fp, "Bad embedded key"),
-    };
-    let sig_arr: [u8; 64] = match sig_bytes.as_slice().try_into() {
-        Ok(a) => a,
-        Err(_) => return status("invalid", &fp, "Bad signature"),
-    };
-    let sig = Signature::from_bytes(&sig_arr);
-    if vk.verify(&data, &sig).is_err() {
-        return status("invalid", &fp, "Signature verification failed");
-    }
-    let payload: LicensePayload = match serde_json::from_slice(&data) {
-        Ok(p) => p,
-        Err(_) => return status("invalid", &fp, "Bad payload"),
-    };
-
-    if !payload.devices.is_empty() && !payload.devices.contains(&fp) {
-        return LicenseStatus {
-            state: "wrong_device".to_string(),
-            device_code: fp,
-            shop_name: Some(payload.shop_name),
-            modules: payload.modules,
-            expires: payload.expires,
-            message: Some("License is not valid for this device".to_string()),
-        };
-    }
-    if let Some(exp) = payload.expires {
-        if now_ms() > exp {
-            return LicenseStatus {
-                state: "expired".to_string(),
-                device_code: fp,
-                shop_name: Some(payload.shop_name),
-                modules: payload.modules,
-                expires: payload.expires,
-                message: Some("License has expired".to_string()),
-            };
+fn read_or_start_trial(data_dir: &Path, now: i64) -> i64 {
+    let path = data_dir.join(TRIAL_FILE);
+    if let Ok(s) = std::fs::read_to_string(&path) {
+        if let Ok(m) = serde_json::from_str::<TrialMarker>(&s) {
+            return m.started_at;
         }
     }
+    let _ = std::fs::create_dir_all(data_dir);
+    let _ = std::fs::write(&path, serde_json::to_string(&TrialMarker { started_at: now }).unwrap_or_default());
+    now
+}
+
+fn mk(
+    state: &str,
+    access: &str,
+    fp: &str,
+    shop: Option<String>,
+    modules: Vec<String>,
+    expires: Option<i64>,
+    trial_ends: Option<i64>,
+    msg: Option<String>,
+) -> LicenseStatus {
     LicenseStatus {
-        state: "valid".to_string(),
-        device_code: fp,
-        shop_name: Some(payload.shop_name),
-        modules: payload.modules,
-        expires: payload.expires,
-        message: None,
+        state: state.to_string(),
+        access: access.to_string(),
+        device_code: fp.to_string(),
+        shop_name: shop,
+        modules,
+        expires,
+        trial_ends,
+        message: msg,
     }
 }
 
 pub fn read_license_status(data_dir: &Path) -> LicenseStatus {
-    let path = data_dir.join(LICENSE_FILE);
-    match std::fs::read_to_string(&path) {
-        Ok(content) => verify_license_str(&content),
-        Err(_) => status("missing", &device_fingerprint(), "No license installed"),
+    let fp = device_fingerprint();
+    let now = now_ms();
+
+    // A present license file takes precedence over the trial.
+    if let Ok(content) = std::fs::read_to_string(data_dir.join(LICENSE_FILE)) {
+        match verify_payload(&content) {
+            Err(reason) => return mk("invalid", "readonly", &fp, None, vec![], None, None, Some(reason)),
+            Ok(p) => {
+                if !p.devices.is_empty() && !p.devices.contains(&fp) {
+                    return mk("wrong_device", "readonly", &fp, Some(p.shop_name), p.modules, p.expires, None,
+                        Some("License is not valid for this device".to_string()));
+                }
+                let (state, access, msg) = match p.expires {
+                    None => ("valid", "full", None),
+                    Some(exp) if now <= exp => ("valid", "full", None),
+                    Some(exp) if now <= exp + GRACE_DAYS * DAY_MS => {
+                        ("grace", "full", Some("License expired — please renew (grace period)".to_string()))
+                    }
+                    Some(_) => ("expired", "readonly", Some("License expired — renew to continue editing".to_string())),
+                };
+                return mk(state, access, &fp, Some(p.shop_name), p.modules, p.expires, None, msg);
+            }
+        }
     }
+
+    // No license → self-start trial (never blocks a fresh install).
+    let start = read_or_start_trial(data_dir, now);
+    let trial_end = start + TRIAL_DAYS * DAY_MS;
+    let (state, access, msg) = if now <= trial_end {
+        let days = ((trial_end - now) / DAY_MS) + 1;
+        ("trial", "full", Some(format!("Trial — {} day(s) left", days)))
+    } else if now <= trial_end + GRACE_DAYS * DAY_MS {
+        ("grace", "full", Some("Trial ended — purchase to continue (grace period)".to_string()))
+    } else {
+        ("trial_expired", "readonly", Some("Trial ended — enter a license to continue editing".to_string()))
+    };
+    mk(state, access, &fp, None, vec![], None, Some(trial_end), msg)
 }
 
 pub fn write_license(data_dir: &Path, content: &str) -> Result<(), String> {

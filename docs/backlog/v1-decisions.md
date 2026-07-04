@@ -211,6 +211,21 @@ online/remote dashboard (Phase 4, e.g. BACK-4-006). `admin` remains the on-site 
 - **Resolved:** the setup wizard's first account stays `admin` (full local control). The `owner` role is
   assigned later via user management (BACK-0-007) and is primarily meaningful for the future online phase.
 
+## D24 — Gating is read-only, NEVER destructive
+
+**Decision:** ✅ When a license/trial is inactive (expired past grace, wrong device, invalid), the app enters
+a **read-only** state — it blocks new writes/edits but **never deletes, wipes, or tears down any data**. All
+existing records (customers, assets, job tickets, invoices, history) remain fully intact and readable. The
+moment the shop reactivates/pays and installs a valid license, full access is restored with everything
+exactly as it was.
+
+**Why:** the shop's data is theirs; licensing controls access, not ownership. Destroying data on lapse would
+be unacceptable and destroy trust. (Consistent with D5/D21's read-only-not-hostage stance.)
+
+**How to apply:** the license gate blocks mutating HTTP endpoints (returns read-only) but always allows reads,
+login/logout, and installing a license. No code path deletes data on a license state change. Backups (D18)
+further protect against loss.
+
 ## D23 — Data architecture: single shared Rust/axum HTTP API
 
 **Decision:** ✅ **Single path.** All clients — the desktop Tauri app AND LAN mobile/tablet browsers — talk

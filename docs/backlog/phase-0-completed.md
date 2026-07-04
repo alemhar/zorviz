@@ -6,6 +6,51 @@
 
 ---
 
+## ✅ BACK-0-C006 · Signed License + Device Fingerprint + Trial + Gating
+
+**Completed:** 2026-07-04 (2 increments)
+**Original Backlog ID:** BACK-0-006
+**Traces to:** D17, D21, D24
+
+**What was implemented:**
+- **Crypto core** (`src-tauri/src/license.rs`): Ed25519 signature verification against an embedded public
+  key; device fingerprint = sha256 of the OS machine-uid (16 hex chars); license file =
+  `{data: base64(payload JSON), sig: base64(ed25519)}`; BOM-tolerant parsing. Payload carries `shop_name`,
+  allowed `devices` (fingerprints), `modules`, `expires`, `license_id`.
+- **`licensegen` bin** (owner-side): `keygen` (make a keypair), `fingerprint` (read a device code),
+  `sign --shop --devices --modules --expires --key` (issue a signed license). Owner keeps the private key;
+  the public key is embedded in the app. `default-run = "zorviz-desktop"` keeps `tauri dev` launching the app.
+- **Trial (D21):** frictionless self-start — no license → a 90-day trial auto-starts (marker in `data/trial.json`).
+  Issued trial = a signed license with `--expires`. Grace period (3 days) after expiry keeps full access with
+  a warning, then read-only.
+- **Gating (D24 — read-only, never destructive):** an axum middleware blocks mutating `/api/*` requests with
+  403 when access is `readonly`, while **always allowing reads, login/logout, and installing a license**.
+  No code path deletes data on a license lapse; reactivating restores full access with data intact.
+- **UI:** `LicenseArea` — a top banner (trial/grace/read-only) + a dialog showing the **device code** (copyable)
+  and a paste-and-install box. Wired into `App.tsx`; a `useLicenseStore` fetches status on load.
+- Endpoints: `GET /api/license` (public; always returns the device code), `POST /api/license` (installs).
+
+**Verification (curl + Playwright):** valid/wrong_device/tampered(invalid)/missing all classify correctly;
+Ed25519 rejects tampering. Gate: full → mutation 200; forced expired-trial → `readonly`, mutation **403**,
+read **200**, login **200** (exempt); reinstall license → `valid`, mutation **200 again, data intact**.
+UI: trial banner renders, license dialog shows the device code — zero console errors.
+
+**⚠️ Notes / limitations (accepted):**
+- Embedded key is a **DEV key** — the owner must run `licensegen keygen`, keep the private key secret, and
+  replace `EMBEDDED_PUBLIC_KEY_B64` for production.
+- **Reissue/transfer** for a new device = the owner re-runs `licensegen sign` with the new device's fingerprint
+  (mechanism supported; no self-service portal).
+- Trial-reset: the trial marker lives in `data/` (deleting it resets the trial). Full anti-reset needs the
+  online layer (D20, deferred) — accepted for v1 (D21).
+
+**Key files:**
+- `apps/desktop/src-tauri/src/license.rs` (new), `apps/desktop/src-tauri/src/bin/licensegen.rs` (new)
+- `apps/desktop/src-tauri/src/server.rs` (license_gate middleware), `apps/desktop/src-tauri/src/api_data.rs` (endpoints)
+- `apps/desktop/src-tauri/src/db.rs` (`data_dir()`), `apps/desktop/src-tauri/Cargo.toml` (ed25519-dalek, machine-uid, base64, rand; default-run)
+- `apps/desktop/src/stores/license.ts` (new), `apps/desktop/src/components/license-area.tsx` (new), `apps/desktop/src/App.tsx`
+
+---
+
 ## ✅ BACK-0-C001 · Fix the Production Build
 
 **Completed:** 2026-07-04

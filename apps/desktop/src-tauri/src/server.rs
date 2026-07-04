@@ -1,6 +1,8 @@
 use axum::{
     body::Body,
-    http::{header, HeaderValue, StatusCode, Uri},
+    extract::Request,
+    http::{header, HeaderValue, Method, StatusCode, Uri},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -130,6 +132,7 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
             get(api_data::search_inventory).post(api_data::create_inventory),
         )
         .fallback(static_handler) // serve the SPA for everything else
+        .layer(middleware::from_fn(license_gate))
         .layer(cors_layer())
         .with_state(api_state);
 
@@ -148,6 +151,26 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
             }
         }
     });
+}
+
+// Read-only gate (D24): when the license/trial is inactive, block mutating business requests
+// but NEVER touch data. Reads, auth, and installing a license are always allowed.
+async fn license_gate(req: Request, next: Next) -> Response {
+    let mutating = matches!(req.method(), &Method::POST | &Method::PUT | &Method::DELETE | &Method::PATCH);
+    let path = req.uri().path();
+    let exempt = matches!(path, "/api/login" | "/api/logout" | "/api/license");
+
+    if mutating && path.starts_with("/api/") && !exempt {
+        let status = crate::license::read_license_status(&crate::db::data_dir());
+        if status.access == "readonly" {
+            return (
+                StatusCode::FORBIDDEN,
+                "License inactive — the app is read-only. Your data is safe; enter a valid license to continue editing.",
+            )
+                .into_response();
+        }
+    }
+    next.run(req).await
 }
 
 async fn info_handler() -> Json<Value> {

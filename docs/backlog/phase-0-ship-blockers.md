@@ -1,6 +1,6 @@
 # Phase 0 Backlog — v1 Ship Blockers & Foundation
 
-> **Status:** In progress — 6 of 13 complete (BACK-0-001, 002, 003, 004, 009, 010 ✅) + BACK-0-005 increments 1–3 (LAN, phone-verified)
+> **Status:** In progress — 7 of 13 complete (BACK-0-001, 002, 003, 004, 006, 009, 010 ✅) + BACK-0-005 increments 1–3 (LAN, phone-verified). Remaining: BACK-0-007 (user mgmt), 008 (backup), 011 (dashboard stats), 012 (online enforcement — deferred), 013 (logo upload).
 > **Scope:** Foundation fixes and new cross-cutting infrastructure required before Zorviz can ship a
 > usable v1 to a real shop. Derived from the plan/design audit (2026-07-04) and owner decisions in
 > [`v1-decisions.md`](./v1-decisions.md).
@@ -58,49 +58,6 @@ mobile = admin/advisor/mechanic. Built in the 4 increments listed in D23.
 - [ ] All mechanic-facing views mobile-first: ≥44px touch targets, ~430px layout *(Plan.txt)*
 - [x] Server binds to LAN IP; reachable from the network interface *(Increment 2; physical-phone test pending Increment 3)*
 - [~] Basic hardening: CORS locked to app origins (no wildcard) done *(Increment 2)*; per-endpoint input validation ongoing as endpoints are added *(Increment 3)*
-
----
-
-## BACK-0-006 · Signed License + Device Fingerprint Activation
-
-**Priority:** 🔴 P0 — owner requires it in v1 (D17)
-**Area:** `apps/desktop/src-tauri/` (fingerprint + verify), new license-generator tool, wizard
-**Traces to:** D17, D21
-**Description:**
-Offline license protection with issue-time fingerprint binding (see D17 for the full model). Blocks one
-purchase being reused across branches. Also covers **trial / time-limited licenses** (D21). **⚠️ Heavy
-crypto+tooling item; adds no app usability — it extends the timeline. Recorded per owner's explicit choice.**
-
-**Progress:**
-- ✅ **Increment 1 (crypto core + generator + status endpoint) — done 2026-07-04.** `src-tauri/src/license.rs`:
-  Ed25519 verify against an embedded public key, device fingerprint (sha256 of OS machine-uid, 16-hex),
-  license file = `{data: base64(payload), sig: base64(ed25519)}`, status computation (valid / wrong_device /
-  expired / invalid / missing), BOM-tolerant. `licensegen` bin (`keygen` / `fingerprint` / `sign`). Endpoints
-  `GET /api/license` (public — always returns the device code) + `POST /api/license` (auth, installs the file).
-  `Cargo.toml` `default-run = "zorviz-desktop"` so `tauri dev` still launches the app. Verified via curl:
-  valid → valid+shop+device+modules; wrong-device → wrong_device; tampered → invalid (sig fails); missing → missing.
-- ⏳ **Increment 2** — trial (D21: frictionless self-start + issued; grace→read-only), app gating/limited state,
-  and UI (device-code display in setup/settings, load-license screen, status banner), reissue path.
-
-**Acceptance Criteria:**
-- [x] Key pair generated; **private key stored securely by owner** (never shipped); public key embedded in app *(dev key embedded; owner regenerates for prod)*
-- [x] Rust derives a stable device fingerprint *(OS machine-uid → sha256; MachineGuid on Windows)*
-- [ ] Wizard/settings screen displays the device code for the owner to send in *(Increment 2)*
-- [x] "Load license" flow: app verifies signature (public key) + fingerprint match + expiry + modules *(verify done + POST endpoint; UI screen in Increment 2)*
-- [ ] App refuses to run / enters limited state without a valid license for this device *(Increment 2 — no gating yet)*
-- [x] License encodes enabled **modules** (foundation for the commercial model) *(Plan.txt §7)*
-- [x] **License-generator tool** (`licensegen` bin): shop name + fingerprint(s) + modules + expiry → signed file *(trial length = `--expires`)*
-- [ ] **Reissue/transfer path** for hardware changes (documented process + tool support) *(Increment 2)*
-- [x] Limitation documented: deters casual copying, not skilled reverse-engineering *(license.rs + D17)*
-
-**Trial / time-limited license (D21):**
-- [ ] Licenses support an `expires` timestamp; trial = `now + N months` (N chosen at generation)
-- [ ] **Frictionless self-start:** first run with no license auto-starts an N-month trial (default N baked in)
-- [ ] **Issued trial license:** owner can generate a signed trial license via the same flow (optionally fingerprint-bound)
-- [ ] **Expiry behavior:** short grace period (warnings, still functional) → then **read-only** (view/export/backup
-      allowed, create/edit blocked) + purchase prompt. Not a hard lock — never lock the shop out of its own data
-- [ ] Self-start trial start-time persisted keyed to fingerprint in a reinstall-surviving location (registry /
-      OS app-data) as partial anti-reset; full prevention deferred to the online layer (D20)
 
 ---
 
