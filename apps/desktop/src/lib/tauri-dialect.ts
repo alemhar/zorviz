@@ -9,7 +9,6 @@ import {
     SqliteQueryCompiler,
 } from 'kysely';
 import { invoke } from '@tauri-apps/api/core';
-import type { Database } from '@zorviz/db';
 
 /**
  * Tauri SQLite Driver for Kysely
@@ -25,15 +24,15 @@ class TauriSqliteDriver implements Driver {
     }
 
     async beginTransaction(connection: DatabaseConnection): Promise<void> {
-        await connection.executeQuery({ sql: 'BEGIN', parameters: [] } as CompiledQuery);
+        await connection.executeQuery(CompiledQuery.raw('BEGIN'));
     }
 
     async commitTransaction(connection: DatabaseConnection): Promise<void> {
-        await connection.executeQuery({ sql: 'COMMIT', parameters: [] } as CompiledQuery);
+        await connection.executeQuery(CompiledQuery.raw('COMMIT'));
     }
 
     async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
-        await connection.executeQuery({ sql: 'ROLLBACK', parameters: [] } as CompiledQuery);
+        await connection.executeQuery(CompiledQuery.raw('ROLLBACK'));
     }
 
     async releaseConnection(): Promise<void> {

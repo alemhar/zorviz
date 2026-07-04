@@ -1,4 +1,4 @@
-import type { Generated, Insertable, Selectable, Updateable } from 'kysely';
+import type { Insertable, Selectable, Updateable } from 'kysely';
 
 // ============================================
 // Core Tables

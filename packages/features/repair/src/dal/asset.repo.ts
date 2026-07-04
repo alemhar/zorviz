@@ -1,4 +1,4 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
 import type { Database } from '@zorviz/db';
 import { AssetWithHistory, CreateAssetInput } from '../types';
 

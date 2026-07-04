@@ -1,13 +1,12 @@
+import type { Asset as DbAsset, Booking, Order } from '@zorviz/db';
 
-import { InferSelectModel } from 'drizzle-orm';
-import * as schema from '@zorviz/db';
+export type Asset = DbAsset;
+export type { Booking, Order };
 
-export type Asset = InferSelectModel<typeof schema.assets>;
-export type Booking = InferSelectModel<typeof schema.bookings>;
-export type Order = InferSelectModel<typeof schema.orders>;
-
-// Extend for UI (Mobile Cards)
-export interface AssetWithHistory extends Asset {
+// Extend for UI (Mobile Cards). `specs` is parsed from its JSON string form
+// into an object for consumption in the UI / repository layer.
+export interface AssetWithHistory extends Omit<DbAsset, 'specs'> {
+    specs: Record<string, any>;
     lastVisit?: Date;
     pendingBookings?: Booking[];
 }

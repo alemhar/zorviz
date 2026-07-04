@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { repairModule } from "../../../lib/db";
 import { AssetWithHistory } from "@zorviz/feature-repair";
-import { Input, Button, Card, CardHeader, CardTitle, CardContent } from "@zorviz/ui";
+import { Input, Button, Card, CardHeader, CardContent } from "@zorviz/ui";
 import { Search, Plus, Car, Smartphone, Watch } from "lucide-react";
 
 export function AssetDiscovery() {

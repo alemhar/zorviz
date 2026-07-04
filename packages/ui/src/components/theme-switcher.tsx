@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import { useThemeColor } from "./theme-provider"
 import { Button } from "./ui/button"
 import { cn } from "../lib/utils"
