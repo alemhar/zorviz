@@ -114,3 +114,72 @@
 - `apps/desktop/src/lib/seeder.ts`, `packages/db/src/seed.ts`
 
 ---
+
+## ✅ BACK-0-C003 · First-Run Setup Wizard
+
+**Completed:** 2026-07-04
+**Original Backlog ID:** BACK-0-003
+**Traces to:** D13, D14, D16
+
+**What was implemented:**
+- **Setup detection + gating.** `useAppConfigStore` now exposes `isChecked`/`isSetup` (an `app_config`
+  row exists). `App.tsx` fetches config on load; while unchecked it shows a splash; if not set up it forces
+  all routes to `/setup`; once set up, the normal auth-gated routes apply. The wizard cannot be re-triggered
+  once an `app_config` row exists.
+- **4-step wizard** (`apps/desktop/src/pages/setup.tsx`): (1) Shop details — shop name (required), address,
+  contact phone/email, tax/registration ID; (2) Custom fields — arbitrary `label => value` rows saved as
+  JSON to `app_config.custom_fields`; (3) Currency & tax — currency symbol (required), locale, tax rate %
+  (stored as a fraction, no region default per D13); (4) Admin account — name, username, PIN (+confirm).
+- On finish: writes the `app_config` row and the first **admin** user (PIN hashed, see C004), refreshes the
+  config store, and routes to `/login`.
+- **Schema:** added dedicated `app_config.shop_name` (distinct from `device_name`, which is the LAN device
+  identifier). Shop name now shows on the login screen and dashboard header.
+- Removed the obsolete in-app dev seeder (`apps/desktop/src/lib/seeder.ts`) and its login-page "Seed DB"
+  button; the wizard is the real onboarding path. Dev console seeder (`packages/db/src/seed.ts`) updated.
+
+**Verification:**
+- `tsc` + `vite build` → exit 0.
+- Real app boot on a fresh DB: migration applied; `app_config` and `users` both have 0 rows → app routes
+  to the setup wizard (setup-detection path confirmed).
+
+**⚠️ Partial / deferred:**
+- **Logo image upload deferred** → split out as **BACK-0-013** (needs new Tauri fs plumbing; cosmetic,
+  mainly for PDF invoices). `logo_path` column exists and is written as `null` for now.
+- The wizard UI was verified by build + data-layer checks, **not** click-tested end-to-end (headless
+  environment — no GUI interaction available). Logic and types are sound; worth a manual click-through.
+- Wizard uses `DEV_TENANT_ID` for `tenant_id` (single-install v1); per-install tenant provisioning is future.
+
+**Key files:**
+- `apps/desktop/src/pages/setup.tsx` (new), `apps/desktop/src/App.tsx`, `apps/desktop/src/stores/app-config.ts`
+- `packages/db/migrations/sqlite/0000_init.sql` (shop_name), `packages/db/src/types.ts`
+- `apps/desktop/src/pages/login.tsx`, `apps/desktop/src/pages/dashboard.tsx`
+
+---
+
+## ✅ BACK-0-C004 · Username + PIN Authentication
+
+**Completed:** 2026-07-04 (done together with the setup wizard, which mints the first credential)
+**Original Backlog ID:** BACK-0-004
+**Traces to:** D15
+
+**What was implemented:**
+- Replaced email+password with **username + numeric PIN** for all roles.
+- **PBKDF2 hashing** (`apps/desktop/src/lib/crypto.ts`): per-user random 16-byte salt, SHA-256, 150k
+  iterations, 256-bit derived key — not a bare/unsalted hash (PINs are low-entropy). `hashPin`/`verifyPin`/
+  `generateSalt` helpers; `verifyPin` uses a constant-ish-time compare.
+- **Schema:** `users` now has `name`, `username` (unique), `pin_hash`, `pin_salt`, `role`, `email`
+  (nullable), `is_active`. `UserRole` type = `owner | admin | advisor | mechanic` (see below).
+- **Auth store** reworked: `login(username, pin)` looks up an active user, verifies via PBKDF2, and applies
+  a **5-attempt / 30s lockout** (in-memory). Persists only `user`/`isAuthenticated`.
+- Removed seeded/published default credentials from the login page; real credentials come from the wizard.
+  Node dev seeder produces a PBKDF2 PIN hash **verified byte-for-byte compatible** with the app's Web Crypto
+  verifier (parity test: node `pbkdf2Sync` === `webcrypto.subtle.deriveBits`).
+
+**⚠️ Deferred to BACK-0-005:** "auth bound to the LAN HTTP session (token/cookie)" — this is local/desktop
+auth for now; LAN session binding lands with the HTTP API + LAN serving item.
+
+**Key files:**
+- `apps/desktop/src/lib/crypto.ts` (new), `apps/desktop/src/stores/auth.ts`
+- `packages/db/migrations/sqlite/0000_init.sql`, `packages/db/src/types.ts`, `packages/db/src/seed.ts`
+
+---

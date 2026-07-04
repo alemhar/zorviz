@@ -1,6 +1,6 @@
 # Phase 0 Backlog — v1 Ship Blockers & Foundation
 
-> **Status:** In progress — 2 of 12 complete (BACK-0-001 ✅, BACK-0-002 ✅)
+> **Status:** In progress — 4 of 13 complete (BACK-0-001, 002, 003, 004 ✅)
 > **Scope:** Foundation fixes and new cross-cutting infrastructure required before Zorviz can ship a
 > usable v1 to a real shop. Derived from the plan/design audit (2026-07-04) and owner decisions in
 > [`v1-decisions.md`](./v1-decisions.md).
@@ -8,46 +8,6 @@
 
 Every item traces to one or more decisions (D1–D19) in `v1-decisions.md`. Work top-down: **P0 → P1 → P2.**
 See the **Critical Path to v1** in [`README.md`](./README.md) for the full cross-phase ordering.
-
----
-
-## BACK-0-003 · First-Run Setup Wizard
-
-**Priority:** 🔴 P0 — a fresh install currently cannot log in (no users, no config)
-**Area:** `apps/desktop/src/pages/setup.tsx` (new), `app_config` + `users`
-**Traces to:** D13, D14, D16
-**Description:**
-On first launch (empty DB / no `app_config` row), run a one-time wizard before the login screen. Creates
-the shop config and the first admin. Replaces the dev seed script as the real onboarding path.
-
-**Acceptance Criteria:**
-- [ ] App detects "not set up" (no `app_config` row) and routes to `/setup` before login
-- [ ] Step — Shop identity: shop name (required), address, contact phone/email, logo image upload
-      (saved to disk, path in `app_config.logo_path`), tax/registration ID
-- [ ] Step — Custom fields: optional `label => value` pairs saved to `app_config.custom_fields` (JSON)
-- [ ] Step — Locale/money: currency symbol, locale, tax rate (no pre-filled region defaults) *(D13)*
-- [ ] Step — First admin: owner name + username + PIN *(D16, D15)*
-- [ ] On finish: `app_config` row + admin user written; app proceeds to normal login
-- [ ] Wizard cannot be re-triggered once setup is complete
-- [ ] Shop name/logo/details now flow to app header, login screen, and PDF invoices *(cosmetic only — not licensing, D17)*
-
----
-
-## BACK-0-004 · Username + PIN Authentication
-
-**Priority:** 🔴 P0 — required before LAN mobile login is usable
-**Area:** `apps/desktop/src/stores/auth.ts`, auth on the HTTP API (BACK-0-005)
-**Traces to:** D15
-**Description:**
-Replace email+password with username + numeric PIN — fast to enter on a phone. Applies to all roles.
-
-**Acceptance Criteria:**
-- [ ] Login by username (or pick-from-list) + PIN
-- [ ] PIN stored **salted + hashed** (per-user salt); no plaintext, no unsalted SHA-256
-- [ ] Rate-limit / lockout after N failed attempts (PINs are low-entropy)
-- [ ] Auth bound to the LAN HTTP session (token/cookie), not just client state *(ties to BACK-0-005)*
-- [ ] Seed/default published credentials removed; real credentials come from the wizard *(D14)*
-- [ ] Existing email+password code paths retired or migrated
 
 ---
 
@@ -214,5 +174,23 @@ requires the project's first backend; owner chose to keep it off the v1 critical
 - [ ] Check-in responses signed (anti-spoof / anti-MITM)
 - [ ] Hosted backend: minimal API + license/device DB (managed platform to minimize ops)
 - [ ] Does NOT gate first-run activation — offline license (BACK-0-006) remains the primary path
+
+---
+
+## BACK-0-013 · Shop Logo Upload
+
+**Priority:** 🟢 P2 — cosmetic; split out of BACK-0-003 (setup wizard)
+**Area:** `apps/desktop/src-tauri/` (fs command), `apps/desktop/src/pages/setup.tsx` + settings
+**Traces to:** D14
+**Description:**
+The setup wizard collects all branding EXCEPT the logo image, which needs new Tauri filesystem plumbing
+to write the uploaded file to disk. Deferred from BACK-0-003 because it's cosmetic and mainly surfaces on
+PDF invoices (BACK-2-009). `app_config.logo_path` column already exists (currently written as `null`).
+
+**Acceptance Criteria:**
+- [ ] Rust command (or fs plugin) to save an uploaded image to `{data_dir}/media/` and return its path
+- [ ] Logo file picker in the setup wizard (and later the settings page) → saves path to `app_config.logo_path`
+- [ ] Logo displayed in the app header / login and on PDF invoices (when BACK-2-009 lands)
+- [ ] Replacing the logo removes/overwrites the old file
 
 ---

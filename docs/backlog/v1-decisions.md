@@ -201,6 +201,16 @@ just a license with `expires = now + N months` (N set by the owner at generation
 a self-start trial. Partial mitigation: persist trial-start keyed to the device fingerprint in a sticky
 location that survives reinstall (registry / OS app-data outside the app folder). Full prevention needs
 the online layer (D20, deferred). Accepted for v1 — trial abuse is low-stakes vs. paid-license piracy.
+
+## D22 — 'owner' user role
+
+**Decision:** ✅ **Add an `owner` role** to `UserRole` (now `owner | admin | advisor | mechanic`).
+The owner is the business owner and highest-privilege role, intended as the primary user of the future
+online/remote dashboard (Phase 4, e.g. BACK-4-006). `admin` remains the on-site shop administrator.
+- Added to the type now so data/roles are forward-compatible; no DB constraint change (role is TEXT).
+- v1 note: the setup wizard still creates the first account as `admin` (full local control). Whether the
+  first account should instead be `owner` — or whether owner is assigned later via user management
+  (BACK-0-007) — is a small open question; defaulting to `admin` for now.
 - Requires a **license-generation tool on the owner's side** to create + sign licenses per sale.
 
 **⚠️ Timeline note:** Owner chose "include in v1" over "fast-follow" (my recommendation was fast-follow).

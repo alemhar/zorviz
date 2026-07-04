@@ -6,12 +6,16 @@
 --   * Rates (e.g. tax_rate) and quantities/stock remain REAL.
 
 CREATE TABLE users (
-    id            TEXT PRIMARY KEY NOT NULL,
-    email         TEXT NOT NULL,
-    role          TEXT NOT NULL,
-    password_hash TEXT,
-    created_at    INTEGER NOT NULL,
-    updated_at    INTEGER NOT NULL
+    id         TEXT PRIMARY KEY NOT NULL,
+    name       TEXT NOT NULL,
+    username   TEXT NOT NULL,
+    pin_hash   TEXT NOT NULL,
+    pin_salt   TEXT NOT NULL,
+    role       TEXT NOT NULL,
+    email      TEXT,
+    is_active  INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
 );
 
 CREATE TABLE customers (
@@ -29,6 +33,7 @@ CREATE TABLE app_config (
     id                  TEXT PRIMARY KEY NOT NULL,
     tenant_id           TEXT NOT NULL,
     branch_id           TEXT NOT NULL,
+    shop_name           TEXT NOT NULL,
     device_name         TEXT NOT NULL,
     currency_symbol     TEXT NOT NULL DEFAULT '$',
     locale              TEXT NOT NULL DEFAULT 'en-US',
@@ -119,7 +124,7 @@ CREATE TABLE sync_metadata (
     sync_hash      TEXT
 );
 
-CREATE UNIQUE INDEX users_email_unique ON users (email);
+CREATE UNIQUE INDEX users_username_unique ON users (username);
 CREATE UNIQUE INDEX inventory_sku_unique ON inventory (sku);
 CREATE INDEX customers_phone_idx ON customers (phone);
 CREATE INDEX assets_owner_idx ON assets (owner_id);

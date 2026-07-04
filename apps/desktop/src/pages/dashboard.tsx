@@ -50,11 +50,11 @@ export default function DashboardPage() {
         <div className="min-h-screen bg-background">
             <header className="border-b p-4 flex items-center justify-between bg-card/50 backdrop-blur-sm">
                 <div className="flex items-center gap-4">
-                    <h1 className="font-bold text-xl bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Zorviz</h1>
+                    <h1 className="font-bold text-xl bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">{config?.shop_name || "Zorviz"}</h1>
                     <ServerStatus />
                 </div>
                 <div className="flex items-center gap-4">
-                    <span className="text-sm text-muted-foreground">{user?.email} ({user?.role})</span>
+                    <span className="text-sm text-muted-foreground">{user?.name} ({user?.role})</span>
                     <Button variant="outline" size="sm" onClick={handleLogout}>Logout</Button>
                 </div>
             </header>

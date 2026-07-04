@@ -14,11 +14,19 @@ type Nullable<T> = ColumnType<T | null, T | null | undefined, T | null>;
 // Core Tables
 // ============================================
 
+// 'owner' is the business owner (highest privilege; primary user of the future online/remote
+// dashboard). 'admin' is the on-site shop administrator. See D22.
+export type UserRole = 'owner' | 'admin' | 'advisor' | 'mechanic';
+
 export interface UsersTable {
     id: string;
-    email: string;
-    role: 'admin' | 'advisor' | 'mechanic' | 'customer';
-    password_hash: Nullable<string>;
+    name: string;
+    username: string;
+    pin_hash: string;
+    pin_salt: string;
+    role: UserRole;
+    email: Nullable<string>;
+    is_active: ColumnType<number, number | undefined, number>; // 1 = active, 0 = deactivated
     created_at: number;
     updated_at: number;
 }
@@ -58,6 +66,7 @@ export interface AppConfigTable {
     id: string;
     tenant_id: string;
     branch_id: string;
+    shop_name: string;
     device_name: string;
     currency_symbol: string;
     locale: string;
