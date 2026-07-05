@@ -43,6 +43,32 @@ async fn tax_rate(state: &ApiState) -> f64 {
         .unwrap_or(0.0)
 }
 
+// Max manual-discount cap (fraction) from app_config; None = no cap. Senior/PWD is exempt.
+async fn max_discount_pct(state: &ApiState) -> Option<f64> {
+    sqlx::query("SELECT max_discount_pct FROM app_config WHERE id = 'default' LIMIT 1")
+        .fetch_optional(&state.pool)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|r| r.try_get::<Option<f64>, _>("max_discount_pct").ok())
+        .flatten()
+        .filter(|v| *v > 0.0)
+}
+
+// Reject a manual discount that exceeds the configured max (% of subtotal). Ok if no cap.
+fn check_discount_cap(subtotal: i64, discount: i64, max: Option<f64>) -> Result<(), (StatusCode, String)> {
+    if let Some(m) = max {
+        let cap = (subtotal as f64 * m).round() as i64;
+        if discount > cap {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("Discount exceeds the maximum allowed ({:.0}% of subtotal).", m * 100.0),
+            ));
+        }
+    }
+    Ok(())
+}
+
 // Generic row -> JSON object (INTEGER -> number, REAL -> number, TEXT -> string, NULL -> null).
 pub(crate) fn row_to_json(row: &SqliteRow) -> Map<String, Value> {
     let mut map = Map::new();
@@ -651,16 +677,26 @@ pub async fn save_estimate(
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(req): Json<SaveEstimateReq>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Json<Value>, (StatusCode, String)> {
     if session_from_headers(&state, &headers).is_none() {
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err((StatusCode::UNAUTHORIZED, "unauthorized".to_string()));
     }
+
+    // Cap check BEFORE mutating anything (compute subtotal from the incoming items first).
+    let subtotal_pre: i64 = req
+        .items
+        .iter()
+        .map(|i| (i.quantity * i.unit_price as f64).round() as i64)
+        .sum();
+    check_discount_cap(subtotal_pre, req.discount, max_discount_pct(&state).await)?;
+
+    let ise = || (StatusCode::INTERNAL_SERVER_ERROR, "estimate save failed".to_string());
 
     sqlx::query("DELETE FROM order_items WHERE order_id = ?")
         .bind(&id)
         .execute(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| ise())?;
 
     let mut subtotal: i64 = 0;
     for item in &req.items {
@@ -682,7 +718,7 @@ pub async fn save_estimate(
         .bind(&item.inventory_item_id)
         .execute(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|_| ise())?;
     }
 
     let rate = tax_rate(&state).await;
@@ -707,9 +743,9 @@ pub async fn save_estimate(
     .bind(&id)
     .execute(&state.pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|_| ise())?;
 
-    order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
+    order_detail(&state, &id).await.ok_or((StatusCode::NOT_FOUND, "not found".to_string())).map(Json)
 }
 
 #[derive(Deserialize)]
@@ -736,6 +772,8 @@ pub async fn set_discounts(
         .await
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
     let subtotal = subtotal.ok_or((StatusCode::NOT_FOUND, "order not found".to_string()))?;
+
+    check_discount_cap(subtotal, req.discount, max_discount_pct(&state).await)?;
 
     let rate = tax_rate(&state).await;
     let stype = senior_type(&req.senior_pwd_type);
@@ -886,6 +924,7 @@ pub struct UpdateConfigReq {
     vat_status: Option<String>,
     terms_and_conditions: Option<String>,
     document_title: Option<String>,
+    max_discount_pct: Option<f64>, // fraction; null = no cap
 }
 
 /// PUT /api/config — edit the shop profile (admin/owner only). Never touches
@@ -910,7 +949,7 @@ pub async fn update_config(
         "UPDATE app_config SET shop_name = ?, device_name = ?, currency_symbol = ?, locale = ?, \
          tax_rate = ?, address = ?, contact_phone = ?, contact_email = ?, tax_registration_id = ?, \
          custom_fields = ?, proprietor = ?, business_style = ?, vat_status = ?, \
-         terms_and_conditions = ?, document_title = ?, updated_at = ? WHERE id = 'default'",
+         terms_and_conditions = ?, document_title = ?, max_discount_pct = ?, updated_at = ? WHERE id = 'default'",
     )
     .bind(req.shop_name.trim())
     .bind(req.device_name.trim())
@@ -927,6 +966,7 @@ pub async fn update_config(
     .bind(nz(&req.vat_status))
     .bind(nz(&req.terms_and_conditions))
     .bind(nz(&req.document_title))
+    .bind(req.max_discount_pct.filter(|v| *v > 0.0))
     .bind(now)
     .execute(&state.pool)
     .await

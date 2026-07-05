@@ -19,6 +19,7 @@ export interface UpdateConfigInput {
     vat_status: string | null; // 'vat' | 'non_vat' | null
     terms_and_conditions: string | null;
     document_title: string | null;
+    max_discount_pct: number | null; // fraction; null = no cap
 }
 
 interface AppConfigState {

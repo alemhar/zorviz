@@ -84,6 +84,7 @@ export interface AppConfigTable {
     vat_status: Nullable<string>; // 'vat' | 'non_vat' | null
     terms_and_conditions: Nullable<string>; // printed T&C block
     document_title: Nullable<string>; // printout title; null → "Invoice"
+    max_discount_pct: Nullable<number>; // cap on manual discount as a fraction (null = no cap)
     created_at: number;
     updated_at: number;
 }
