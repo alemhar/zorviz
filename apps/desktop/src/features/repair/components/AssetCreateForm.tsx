@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Button,
     Input,
@@ -10,45 +10,13 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@zorviz/ui";
-import { Car, Smartphone, Package } from "lucide-react";
 import type { AssetWithHistory } from "@zorviz/feature-repair";
 import type { Customer } from "@zorviz/db";
 import { createAsset } from "../../../lib/repair-api";
 import { searchCustomers, createCustomer } from "../../../lib/customers-api";
+import { listAssetTypes, type AssetType } from "../../../lib/asset-types-api";
+import { iconFor } from "../../../lib/asset-icons";
 import { EntityPicker } from "../../../components/entity-picker";
-
-export type AssetType = "vehicle" | "gadget" | "appliance";
-
-// Spec fields per asset type: [key, label].
-export const SPEC_FIELDS: Record<AssetType, [string, string][]> = {
-    vehicle: [
-        ["plateNumber", "Plate Number"],
-        ["vin", "VIN"],
-        ["make", "Make"],
-        ["model", "Model"],
-        ["year", "Year"],
-        ["color", "Color"],
-        ["mileage", "Mileage"],
-    ],
-    gadget: [
-        ["brand", "Brand"],
-        ["model", "Model"],
-        ["serialNumber", "Serial Number"],
-        ["imei", "IMEI"],
-        ["color", "Color"],
-    ],
-    appliance: [
-        ["brand", "Brand"],
-        ["model", "Model"],
-        ["serialNumber", "Serial Number"],
-    ],
-};
-
-const TYPES: { key: AssetType; label: string; icon: typeof Car }[] = [
-    { key: "vehicle", label: "Vehicle", icon: Car },
-    { key: "gadget", label: "Gadget", icon: Smartphone },
-    { key: "appliance", label: "Appliance", icon: Package },
-];
 
 interface Props {
     open: boolean;
@@ -56,34 +24,62 @@ interface Props {
     onCreated: (asset: AssetWithHistory) => void;
 }
 
+// Data-driven asset creation (BACK-1-006): types + fields come from the shop's
+// configured asset_types (only those flagged show_on_create). One type → no picker.
 export function AssetCreateForm({ open, onOpenChange, onCreated }: Props) {
-    const [type, setType] = useState<AssetType>("vehicle");
+    const [types, setTypes] = useState<AssetType[]>([]);
+    const [typeKey, setTypeKey] = useState<string>("");
     const [specs, setSpecs] = useState<Record<string, string>>({});
     const [owner, setOwner] = useState<Customer | null>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
-    const reset = () => {
-        setType("vehicle");
+    // Load the shop's creatable types whenever the dialog opens.
+    useEffect(() => {
+        if (!open) return;
         setSpecs({});
         setOwner(null);
         setError("");
-    };
+        listAssetTypes()
+            .then((all) => {
+                const visible = all.filter((t) => t.show_on_create === 1);
+                setTypes(visible);
+                setTypeKey(visible[0]?.key ?? "");
+            })
+            .catch(() => setError("Could not load asset types."));
+    }, [open]);
+
+    const selected = types.find((t) => t.key === typeKey) ?? null;
 
     const submit = async () => {
-        const filled = Object.fromEntries(
-            Object.entries(specs).filter(([, v]) => v.trim() !== "")
+        if (!selected) {
+            setError("No asset type available.");
+            return;
+        }
+        const filled = Object.fromEntries(Object.entries(specs).filter(([, v]) => v.trim() !== ""));
+        // Required fields must be present.
+        const missing = selected.fields.find((f) => f.required && !(specs[f.key] ?? "").trim());
+        if (missing) {
+            setError(`${missing.label} is required.`);
+            return;
+        }
+        // number fields must be numeric when filled.
+        const badNum = selected.fields.find(
+            (f) => f.kind === "number" && (specs[f.key] ?? "").trim() && isNaN(Number(specs[f.key]))
         );
+        if (badNum) {
+            setError(`${badNum.label} must be a number.`);
+            return;
+        }
         if (Object.keys(filled).length === 0) {
-            setError("Enter at least one detail (e.g. plate or serial number).");
+            setError("Enter at least one detail.");
             return;
         }
         setSaving(true);
         setError("");
         try {
-            const asset = await createAsset({ type, specs: filled, ownerId: owner?.id });
+            const asset = await createAsset({ type: selected.key, specs: filled, ownerId: owner?.id });
             onCreated(asset);
-            reset();
             onOpenChange(false);
         } catch (e) {
             console.error(e);
@@ -94,55 +90,74 @@ export function AssetCreateForm({ open, onOpenChange, onCreated }: Props) {
     };
 
     return (
-        <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>New Asset</DialogTitle>
-                    <DialogDescription>Register a vehicle, gadget, or appliance.</DialogDescription>
+                    <DialogDescription>Register a new item to service.</DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-2">
-                        {TYPES.map((t) => (
-                            <button
-                                key={t.key}
-                                type="button"
-                                onClick={() => setType(t.key)}
-                                className={`flex flex-col items-center gap-1 rounded-md border p-3 transition-colors ${
-                                    type === t.key ? "bg-primary/10 border-primary text-primary" : "hover:bg-muted"
-                                }`}
-                            >
-                                <t.icon className="h-5 w-5" />
-                                <span className="text-xs font-medium">{t.label}</span>
-                            </button>
-                        ))}
-                    </div>
+                    {types.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            No asset types are set to show at ticket creation. Add or enable one in Settings.
+                        </p>
+                    ) : (
+                        <>
+                            {types.length > 1 && (
+                                <div className="grid grid-cols-3 gap-2">
+                                    {types.map((t) => {
+                                        const Icon = iconFor(t.icon);
+                                        return (
+                                            <button
+                                                key={t.key}
+                                                type="button"
+                                                onClick={() => { setTypeKey(t.key); setSpecs({}); }}
+                                                className={`flex flex-col items-center gap-1 rounded-md border p-3 transition-colors ${
+                                                    typeKey === t.key ? "bg-primary/10 border-primary text-primary" : "hover:bg-muted"
+                                                }`}
+                                            >
+                                                <Icon className="h-5 w-5" />
+                                                <span className="text-xs font-medium">{t.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
 
-                    <div className="grid grid-cols-2 gap-3">
-                        {SPEC_FIELDS[type].map(([key, label]) => (
-                            <div key={key} className="space-y-1">
-                                <Label htmlFor={key}>{label}</Label>
-                                <Input
-                                    id={key}
-                                    value={specs[key] ?? ""}
-                                    onChange={(e) => setSpecs((s) => ({ ...s, [key]: e.target.value }))}
+                            {selected && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    {selected.fields.map((f) => (
+                                        <div key={f.key} className="space-y-1">
+                                            <Label htmlFor={`new-${f.key}`}>
+                                                {f.label}
+                                                {f.required && <span className="text-destructive"> *</span>}
+                                            </Label>
+                                            <Input
+                                                id={`new-${f.key}`}
+                                                inputMode={f.kind === "number" ? "numeric" : undefined}
+                                                value={specs[f.key] ?? ""}
+                                                onChange={(e) => setSpecs((s) => ({ ...s, [f.key]: e.target.value }))}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="space-y-1">
+                                <Label>Owner (optional)</Label>
+                                <EntityPicker<Customer>
+                                    value={owner}
+                                    onChange={setOwner}
+                                    search={searchCustomers}
+                                    onCreate={(name) => createCustomer({ name })}
+                                    getLabel={(c) => c.name}
+                                    getSubLabel={(c) => c.phone ?? undefined}
+                                    placeholder="Search or add a customer…"
                                 />
                             </div>
-                        ))}
-                    </div>
-
-                    <div className="space-y-1">
-                        <Label>Owner (optional)</Label>
-                        <EntityPicker<Customer>
-                            value={owner}
-                            onChange={setOwner}
-                            search={searchCustomers}
-                            onCreate={(name) => createCustomer({ name })}
-                            getLabel={(c) => c.name}
-                            getSubLabel={(c) => c.phone ?? undefined}
-                            placeholder="Search or add a customer…"
-                        />
-                    </div>
+                        </>
+                    )}
 
                     {error && <p className="text-sm text-destructive">{error}</p>}
                 </div>
@@ -151,7 +166,7 @@ export function AssetCreateForm({ open, onOpenChange, onCreated }: Props) {
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={saving}>
+                    <Button onClick={submit} disabled={saving || types.length === 0}>
                         {saving ? "Saving…" : "Create Asset"}
                     </Button>
                 </DialogFooter>

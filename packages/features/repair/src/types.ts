@@ -14,7 +14,9 @@ export interface AssetWithHistory extends Omit<DbAsset, 'specs'> {
 export type CreateAssetInput = {
     ownerId?: string; // Optional (Draft/Quick Create)
     tenantId?: string; // Optional (Injected by Repo or passed explicitly)
-    type: 'vehicle' | 'gadget' | 'appliance';
+    // Stable asset-type key (from the shop's configured asset_types, BACK-1-006).
+    // Data-driven, so any configured key is valid — not limited to the former built-ins.
+    type: string;
     specs: Record<string, any>; // { plateNumber: "ABC-1234", mileage: 50000 }
 };
 

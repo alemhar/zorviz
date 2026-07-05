@@ -5,6 +5,7 @@ fn greet(name: &str) -> String {
 }
 
 pub mod api_data;
+pub mod asset_types;
 pub mod auth;
 pub mod backup;
 pub mod db;
@@ -27,6 +28,10 @@ pub fn run() {
 
                 let pool = db::init_db(&handle).await.expect("failed to init db");
                 handle.manage(db::DbState { pool: pool.clone() });
+
+                // Back-compat: installs created before BACK-1-006 have an app_config but no
+                // asset types — seed the built-in templates so their create form still works.
+                asset_types::ensure_seeded_for_existing_install(&pool).await;
 
                 // Auto-backup on launch (best-effort; keeps a rolling set).
                 let _ = backup::backup_now(&pool, &db::data_dir()).await;

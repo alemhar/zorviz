@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@zorviz/ui";
-import { Store, ListPlus, Coins, UserCog, Plus, Trash2 } from "lucide-react";
+import { Store, ListPlus, Coins, UserCog, Plus, Trash2, Shapes } from "lucide-react";
 import { api } from "../lib/api";
 import { useAppConfigStore } from "../stores/app-config";
+import { getAssetTypeTemplates, type AssetTypeTemplate } from "../lib/asset-types-api";
+import { iconFor } from "../lib/asset-icons";
 
 type CustomField = { label: string; value: string };
 
@@ -11,6 +13,7 @@ const STEPS = [
     { title: "Shop Details", icon: Store },
     { title: "Custom Fields", icon: ListPlus },
     { title: "Currency & Tax", icon: Coins },
+    { title: "What You Service", icon: Shapes },
     { title: "Admin Account", icon: UserCog },
 ];
 
@@ -37,6 +40,18 @@ export default function SetupPage() {
     const [locale, setLocale] = useState("");
     const [taxRatePct, setTaxRatePct] = useState("");
 
+    // Asset types (BACK-1-006): built-in templates, all pre-selected.
+    const [templates, setTemplates] = useState<AssetTypeTemplate[]>([]);
+    const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+    useEffect(() => {
+        getAssetTypeTemplates()
+            .then((t) => {
+                setTemplates(t);
+                setSelectedTypes(new Set(t.map((x) => x.key)));
+            })
+            .catch(() => {});
+    }, []);
+
     // Admin
     const [adminName, setAdminName] = useState("");
     const [username, setUsername] = useState("");
@@ -47,7 +62,8 @@ export default function SetupPage() {
         if (s === 0 && !shopName.trim()) return "Shop name is required.";
         if (s === 2 && !currencySymbol.trim()) return "Currency symbol is required.";
         if (s === 2 && taxRatePct.trim() && isNaN(Number(taxRatePct))) return "Tax rate must be a number.";
-        if (s === 3) {
+        if (s === 3 && selectedTypes.size === 0) return "Pick at least one thing you service.";
+        if (s === 4) {
             if (!adminName.trim()) return "Your name is required.";
             if (!username.trim()) return "Username is required.";
             if (!/^\d{4,}$/.test(pin)) return "PIN must be at least 4 digits.";
@@ -73,7 +89,7 @@ export default function SetupPage() {
     };
 
     const finish = async () => {
-        const err = validateStep(3);
+        const err = validateStep(4);
         if (err) return setError(err);
         setSaving(true);
         setError("");
@@ -83,7 +99,12 @@ export default function SetupPage() {
                 ? Object.fromEntries(cleanCustom.map((f) => [f.label.trim(), f.value.trim()]))
                 : null;
 
+            const assetTypes = templates
+                .filter((t) => selectedTypes.has(t.key))
+                .map((t) => ({ key: t.key, name: t.name, icon: t.icon, fields: t.fields, show_on_create: true }));
+
             await api.post("/api/setup", {
+                asset_types: assetTypes,
                 shop_name: shopName.trim(),
                 currency_symbol: currencySymbol.trim(),
                 locale: locale.trim() || "en-US",
@@ -203,6 +224,48 @@ export default function SetupPage() {
                     )}
 
                     {step === 3 && (
+                        <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                                Pick what this shop repairs. This is all you'll be offered when creating a ticket —
+                                you can fine-tune types and their fields anytime in Settings.
+                            </p>
+                            {templates.map((t) => {
+                                const Icon = iconFor(t.icon);
+                                const checked = selectedTypes.has(t.key);
+                                return (
+                                    <button
+                                        key={t.key}
+                                        type="button"
+                                        onClick={() =>
+                                            setSelectedTypes((prev) => {
+                                                const n = new Set(prev);
+                                                if (n.has(t.key)) n.delete(t.key);
+                                                else n.add(t.key);
+                                                return n;
+                                            })
+                                        }
+                                        className={`w-full flex items-center gap-3 rounded-md border p-3 text-left transition-colors ${
+                                            checked ? "bg-primary/10 border-primary" : "hover:bg-muted"
+                                        }`}
+                                    >
+                                        <input type="checkbox" className="h-4 w-4" checked={checked} readOnly />
+                                        <Icon className="w-5 h-5 text-muted-foreground" />
+                                        <div>
+                                            <div className="font-medium">{t.name}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {t.fields.map((f) => f.label).join(", ")}
+                                            </div>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                            <p className="text-xs text-muted-foreground">
+                                Repair something else? Finish setup, then add a custom type in Settings.
+                            </p>
+                        </div>
+                    )}
+
+                    {step === 4 && (
                         <>
                             <div className="space-y-2">
                                 <Label htmlFor="adminName">Your Name *</Label>
