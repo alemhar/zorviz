@@ -34,6 +34,7 @@ export default function SettingsPage() {
     const [currencySymbol, setCurrencySymbol] = useState("");
     const [locale, setLocale] = useState("");
     const [taxRatePct, setTaxRatePct] = useState("");
+    const [maxDiscountPct, setMaxDiscountPct] = useState("");
     // Device
     const [deviceName, setDeviceName] = useState("");
     // Custom fields
@@ -107,6 +108,7 @@ export default function SettingsPage() {
         setCurrencySymbol(config.currency_symbol ?? "");
         setLocale(config.locale ?? "");
         setTaxRatePct(config.tax_rate != null ? String(config.tax_rate * 100) : "");
+        setMaxDiscountPct(config.max_discount_pct != null ? String(config.max_discount_pct * 100) : "");
         setDeviceName(config.device_name ?? "");
         setProprietor(config.proprietor ?? "");
         setBusinessStyle(config.business_style ?? "");
@@ -134,6 +136,8 @@ export default function SettingsPage() {
         if (!currencySymbol.trim()) return "Currency symbol is required.";
         if (!deviceName.trim()) return "Device name is required.";
         if (taxRatePct.trim() && isNaN(Number(taxRatePct))) return "Tax rate must be a number.";
+        if (maxDiscountPct.trim() && (isNaN(Number(maxDiscountPct)) || Number(maxDiscountPct) < 0 || Number(maxDiscountPct) > 100))
+            return "Max discount must be 0–100.";
         return "";
     };
 
@@ -158,6 +162,7 @@ export default function SettingsPage() {
                 currency_symbol: currencySymbol.trim(),
                 locale: locale.trim() || "en-US",
                 tax_rate: taxRatePct.trim() ? Number(taxRatePct) / 100 : null,
+                max_discount_pct: maxDiscountPct.trim() ? Number(maxDiscountPct) / 100 : null,
                 address: address.trim() || null,
                 contact_phone: contactPhone.trim() || null,
                 contact_email: contactEmail.trim() || null,
@@ -334,9 +339,15 @@ export default function SettingsPage() {
                                 <Input id="locale" value={locale} onChange={(e) => setLocale(e.target.value)} placeholder="e.g. en-PH" disabled={ro} />
                             </div>
                         </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="tax">Tax Rate (%)</Label>
-                            <Input id="tax" value={taxRatePct} onChange={(e) => setTaxRatePct(e.target.value)} placeholder="e.g. 12 — blank for none" disabled={ro} />
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <Label htmlFor="tax">Tax Rate (%)</Label>
+                                <Input id="tax" value={taxRatePct} onChange={(e) => setTaxRatePct(e.target.value)} placeholder="e.g. 12 — blank for none" disabled={ro} />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="maxdisc">Max Discount (%)</Label>
+                                <Input id="maxdisc" value={maxDiscountPct} onChange={(e) => setMaxDiscountPct(e.target.value)} placeholder="blank = no cap" disabled={ro} />
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

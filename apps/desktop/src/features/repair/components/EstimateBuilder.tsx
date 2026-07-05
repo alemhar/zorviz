@@ -52,6 +52,7 @@ export function EstimateBuilder({ ticket, open, onOpenChange, onSaved }: Props) 
 
     const [rows, setRows] = useState<Row[]>([]);
     const [discount, setDiscount] = useState("");
+    const [discountMode, setDiscountMode] = useState<"amount" | "pct">("amount");
     const [seniorType, setSeniorType] = useState<"" | "senior" | "pwd">("");
     const [seniorId, setSeniorId] = useState("");
     const [seniorName, setSeniorName] = useState("");
@@ -72,6 +73,7 @@ export function EstimateBuilder({ ticket, open, onOpenChange, onSaved }: Props) 
                 )
             );
             setDiscount(ticket.discount ? String(fromCentavos(ticket.discount)) : "");
+            setDiscountMode("amount");
             setSeniorType((ticket.senior_pwd_type as "senior" | "pwd" | null) ?? "");
             setSeniorId(ticket.senior_pwd_id ?? "");
             setSeniorName(ticket.senior_pwd_name ?? "");
@@ -88,9 +90,14 @@ export function EstimateBuilder({ ticket, open, onOpenChange, onSaved }: Props) 
             newRow("part", { description: p.name, unitPrice: String(fromCentavos(p.unit_price)), inventoryItemId: p.id }),
         ]);
 
+    const maxDiscountPct = config?.max_discount_pct ?? null; // fraction or null
     const lineCentavos = (r: Row) => Math.round((parseFloat(r.quantity) || 0) * toCentavos(parseFloat(r.unitPrice) || 0));
     const subtotal = rows.reduce((s, r) => s + lineCentavos(r), 0);
-    const discountC = toCentavos(parseFloat(discount) || 0);
+    const discountInput = parseFloat(discount) || 0;
+    const discountC =
+        discountMode === "pct" ? Math.round(subtotal * (discountInput / 100)) : toCentavos(discountInput);
+    const effectivePct = subtotal > 0 ? (discountC / subtotal) * 100 : 0;
+    const overCap = maxDiscountPct != null && effectivePct > maxDiscountPct * 100 + 0.001;
     const isSenior = seniorType !== "";
     const seniorDiscC = isSenior ? Math.round(subtotal * 0.2) : 0; // 20% statutory
     const tax = isSenior ? 0 : Math.round(subtotal * taxRate); // VAT-exempt when senior/PWD
@@ -109,6 +116,10 @@ export function EstimateBuilder({ ticket, open, onOpenChange, onSaved }: Props) 
             }));
         if (items.length === 0) {
             setError("Add at least one line item.");
+            return;
+        }
+        if (overCap) {
+            setError(`Discount exceeds the maximum allowed (${((maxDiscountPct ?? 0) * 100).toFixed(0)}%).`);
             return;
         }
         setSaving(true);
@@ -194,9 +205,23 @@ export function EstimateBuilder({ ticket, open, onOpenChange, onSaved }: Props) 
                             <span className="text-muted-foreground">Subtotal</span>
                             <span>{formatMoney(subtotal, currency)}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Discount</span>
-                            <Input className="w-28 h-8" value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" placeholder="0" />
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="text-muted-foreground">
+                                Discount
+                                {discount.trim() && (
+                                    <span className={`ml-2 text-xs ${overCap ? "text-destructive" : "text-muted-foreground"}`}>
+                                        {discountMode === "pct" ? `= ${formatMoney(discountC, currency)}` : `= ${effectivePct.toFixed(1)}%`}
+                                        {maxDiscountPct != null ? ` (max ${(maxDiscountPct * 100).toFixed(0)}%)` : ""}
+                                    </span>
+                                )}
+                            </span>
+                            <div className="flex gap-1">
+                                <div className="flex rounded-md border overflow-hidden text-xs">
+                                    <button type="button" className={`px-2 ${discountMode === "amount" ? "bg-primary text-primary-foreground" : ""}`} onClick={() => setDiscountMode("amount")}>{currency || "$"}</button>
+                                    <button type="button" className={`px-2 ${discountMode === "pct" ? "bg-primary text-primary-foreground" : ""}`} onClick={() => setDiscountMode("pct")}>%</button>
+                                </div>
+                                <Input className={`w-24 h-8 ${overCap ? "border-destructive" : ""}`} value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" placeholder="0" />
+                            </div>
                         </div>
                         <div className="flex justify-between items-center gap-2">
                             <span className="text-muted-foreground">Senior / PWD</span>
@@ -250,7 +275,7 @@ export function EstimateBuilder({ ticket, open, onOpenChange, onSaved }: Props) 
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={saving}>
+                    <Button onClick={submit} disabled={saving || overCap}>
                         {saving ? "Saving…" : "Save Estimate"}
                     </Button>
                 </DialogFooter>

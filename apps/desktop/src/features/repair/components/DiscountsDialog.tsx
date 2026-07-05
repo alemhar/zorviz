@@ -29,6 +29,7 @@ export function DiscountsDialog({ ticket, open, onOpenChange, onSaved }: Props) 
     const taxRate = config?.tax_rate ?? 0;
 
     const [discount, setDiscount] = useState("");
+    const [discountMode, setDiscountMode] = useState<"amount" | "pct">("amount");
     const [seniorType, setSeniorType] = useState<"" | "senior" | "pwd">("");
     const [seniorId, setSeniorId] = useState("");
     const [seniorName, setSeniorName] = useState("");
@@ -38,20 +39,29 @@ export function DiscountsDialog({ ticket, open, onOpenChange, onSaved }: Props) 
     useEffect(() => {
         if (!open) return;
         setDiscount(ticket.discount ? String(fromCentavos(ticket.discount)) : "");
+        setDiscountMode("amount");
         setSeniorType((ticket.senior_pwd_type as "senior" | "pwd" | null) ?? "");
         setSeniorId(ticket.senior_pwd_id ?? "");
         setSeniorName(ticket.senior_pwd_name ?? "");
         setError("");
     }, [open, ticket]);
 
+    const maxDiscountPct = config?.max_discount_pct ?? null;
     const subtotal = ticket.subtotal;
-    const discountC = toCentavos(parseFloat(discount) || 0);
+    const discountInput = parseFloat(discount) || 0;
+    const discountC = discountMode === "pct" ? Math.round(subtotal * (discountInput / 100)) : toCentavos(discountInput);
+    const effectivePct = subtotal > 0 ? (discountC / subtotal) * 100 : 0;
+    const overCap = maxDiscountPct != null && effectivePct > maxDiscountPct * 100 + 0.001;
     const isSenior = seniorType !== "";
     const seniorDiscC = isSenior ? Math.round(subtotal * 0.2) : 0;
     const tax = isSenior ? 0 : Math.round(subtotal * taxRate);
     const total = subtotal + tax - discountC - seniorDiscC;
 
     const submit = async () => {
+        if (overCap) {
+            setError(`Discount exceeds the maximum allowed (${((maxDiscountPct ?? 0) * 100).toFixed(0)}%).`);
+            return;
+        }
         setSaving(true);
         setError("");
         try {
@@ -87,8 +97,22 @@ export function DiscountsDialog({ ticket, open, onOpenChange, onSaved }: Props) 
 
                 <div className="space-y-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
-                        <Label htmlFor="dsc">Manual Discount</Label>
-                        <Input id="dsc" className="w-32 h-9" value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" placeholder="0" />
+                        <Label htmlFor="dsc">
+                            Manual Discount
+                            {discount.trim() && (
+                                <span className={`ml-2 text-xs ${overCap ? "text-destructive" : "text-muted-foreground"}`}>
+                                    {discountMode === "pct" ? `= ${formatMoney(discountC, currency)}` : `= ${effectivePct.toFixed(1)}%`}
+                                    {maxDiscountPct != null ? ` (max ${(maxDiscountPct * 100).toFixed(0)}%)` : ""}
+                                </span>
+                            )}
+                        </Label>
+                        <div className="flex gap-1">
+                            <div className="flex rounded-md border overflow-hidden text-xs">
+                                <button type="button" className={`px-2 ${discountMode === "amount" ? "bg-primary text-primary-foreground" : ""}`} onClick={() => setDiscountMode("amount")}>{currency || "$"}</button>
+                                <button type="button" className={`px-2 ${discountMode === "pct" ? "bg-primary text-primary-foreground" : ""}`} onClick={() => setDiscountMode("pct")}>%</button>
+                            </div>
+                            <Input id="dsc" className={`w-28 h-9 ${overCap ? "border-destructive" : ""}`} value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" placeholder="0" />
+                        </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
                         <Label>Senior / PWD</Label>
@@ -125,7 +149,7 @@ export function DiscountsDialog({ ticket, open, onOpenChange, onSaved }: Props) 
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-                    <Button onClick={submit} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+                    <Button onClick={submit} disabled={saving || overCap}>{saving ? "Saving…" : "Save"}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

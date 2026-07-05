@@ -492,3 +492,33 @@ via the discounts endpoint and rehydrates in the editor UI (Playwright), zero co
 - `apps/desktop/src/pages/job-ticket.tsx`, `apps/desktop/src/lib/invoice-pdf.ts`
 
 ---
+
+## ✅ BACK-2-C016 · Discount as amount/% + max-discount cap
+
+**Completed:** 2026-07-05
+**Origin:** owner request — staff entering a flat discount can't see the % they're giving; cap over-discounting.
+
+**What was implemented (migration 0011):**
+- **Manual discount enterable as amount *or* %** in both the Estimate builder and the final-stage Discounts
+  editor: a small `₱ / %` toggle. The field always shows the **effective figure** — the % when entered as an
+  amount, and the amount when entered as a % — so staff see what they're actually giving. (The stored value
+  remains a centavos amount; % is just an input convenience.)
+- **`app_config.max_discount_pct`** (fraction; null = no cap) — a **Max Discount (%)** setting (admin, in
+  Currency & Tax). When a manual discount's effective % exceeds it, the save is **blocked**:
+  - **Client:** the field turns red, shows "(max N%)", and the Save button disables.
+  - **Server (authoritative):** `save_estimate` (cap-checked *before* mutating) and `POST /api/orders/:id/
+    discounts` return **400** with "Discount exceeds the maximum allowed (N% of subtotal)." — can't be bypassed.
+  - Shared `check_discount_cap` + `max_discount_pct` helpers.
+- The statutory **Senior/PWD 20% is exempt** from the cap (that discount must be given).
+
+**Verification:** builds clean; migration 0011 applied. curl — max set to 15%; discount at 15% → 200, at 20%
+→ **400 with message** on both the estimate and discounts endpoints. Playwright — Settings shows Max Discount
+15; over-cap discount shows the % and disables Save, under-cap re-enables; **percent mode** computes the amount
+(12% of ₱1000 = ₱120). Zero console errors.
+
+**Key files:**
+- `packages/db/migrations/sqlite/0011_max_discount.sql`, `packages/db/src/types.ts`, `apps/desktop/src/stores/app-config.ts`
+- `apps/desktop/src-tauri/src/api_data.rs` (`max_discount_pct`, `check_discount_cap`, `save_estimate`, `set_discounts`)
+- `apps/desktop/src/pages/settings.tsx`, `apps/desktop/src/features/repair/components/{EstimateBuilder,DiscountsDialog}.tsx`
+
+---
