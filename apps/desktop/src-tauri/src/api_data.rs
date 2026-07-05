@@ -199,6 +199,47 @@ pub async fn create_customer(
 
 // ---- Assets ----
 
+/// GET /api/assets/:id — one asset with parsed specs, owner, and service history. Auth required.
+pub async fn get_asset(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, StatusCode> {
+    if session_from_headers(&state, &headers).is_none() {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    let row = sqlx::query("SELECT * FROM assets WHERE id = ? LIMIT 1")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let mut obj = row_to_json(&row);
+    parse_json_field(&mut obj, "specs");
+
+    if let Some(owner_id) = obj.get("owner_id").and_then(|v| v.as_str()).map(String::from) {
+        if let Ok(Some(c)) = sqlx::query("SELECT * FROM customers WHERE id = ? LIMIT 1")
+            .bind(&owner_id)
+            .fetch_optional(&state.pool)
+            .await
+        {
+            obj.insert("owner".to_string(), Value::Object(row_to_json(&c)));
+        }
+    }
+
+    let history = sqlx::query(
+        "SELECT id, status, total, created_at, receipt_number, customer_complaint FROM orders WHERE asset_id = ? ORDER BY created_at DESC",
+    )
+    .bind(&id)
+    .fetch_all(&state.pool)
+    .await
+    .map(|rows| rows.iter().map(|r| Value::Object(row_to_json(r))).collect::<Vec<_>>())
+    .unwrap_or_default();
+    obj.insert("history".to_string(), Value::Array(history));
+
+    Ok(Json(Value::Object(obj)))
+}
+
 #[derive(Deserialize)]
 pub struct CreateAssetReq {
     #[serde(rename = "type")]
@@ -555,6 +596,88 @@ pub async fn save_estimate(
 pub async fn get_license() -> Json<Value> {
     let dd = crate::db::data_dir();
     Json(serde_json::to_value(crate::license::read_license_status(&dd)).unwrap_or(Value::Null))
+}
+
+#[derive(Deserialize)]
+pub struct SetupReq {
+    shop_name: String,
+    address: Option<String>,
+    contact_phone: Option<String>,
+    contact_email: Option<String>,
+    tax_registration_id: Option<String>,
+    custom_fields: Option<Value>,
+    currency_symbol: String,
+    locale: Option<String>,
+    tax_rate: Option<f64>,
+    admin_name: String,
+    admin_username: String,
+    admin_pin: String,
+}
+
+/// POST /api/setup — first-run setup: create app_config + the first admin. Unauthenticated by
+/// design (no user exists yet), but only works while UNCONFIGURED (no app_config row).
+pub async fn setup(
+    State(state): State<ApiState>,
+    Json(req): Json<SetupReq>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    let existing: i64 = sqlx::query("SELECT COUNT(*) AS c FROM app_config")
+        .fetch_one(&state.pool)
+        .await
+        .ok()
+        .and_then(|r| r.try_get::<i64, _>("c").ok())
+        .unwrap_or(0);
+    if existing > 0 {
+        return Err((StatusCode::CONFLICT, "already set up".to_string()));
+    }
+    if req.shop_name.trim().is_empty() || req.currency_symbol.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "shop name and currency are required".to_string()));
+    }
+    if req.admin_name.trim().is_empty() || req.admin_username.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "admin name and username are required".to_string()));
+    }
+    if req.admin_pin.len() < 4 || !req.admin_pin.chars().all(|c| c.is_ascii_digit()) {
+        return Err((StatusCode::BAD_REQUEST, "PIN must be at least 4 digits".to_string()));
+    }
+
+    let now = now_ms();
+    let custom_fields = req.custom_fields.map(|v| v.to_string());
+    sqlx::query(
+        "INSERT INTO app_config (id, tenant_id, branch_id, shop_name, device_name, currency_symbol, locale, \
+         tax_rate, address, contact_phone, contact_email, logo_path, tax_registration_id, custom_fields, created_at, updated_at) \
+         VALUES ('default', 'dev-tenant', 'main', ?, 'Main PC', ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)",
+    )
+    .bind(req.shop_name.trim())
+    .bind(req.currency_symbol.trim())
+    .bind(req.locale.as_deref().unwrap_or("en-US"))
+    .bind(req.tax_rate)
+    .bind(&req.address)
+    .bind(&req.contact_phone)
+    .bind(&req.contact_email)
+    .bind(&req.tax_registration_id)
+    .bind(&custom_fields)
+    .bind(now)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "config insert failed".to_string()))?;
+
+    let (hash, salt) = crate::auth::hash_pin(&req.admin_pin);
+    sqlx::query(
+        "INSERT INTO users (id, name, username, pin_hash, pin_salt, role, is_active, created_at, updated_at) \
+         VALUES (?, ?, ?, ?, ?, 'admin', 1, ?, ?)",
+    )
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(req.admin_name.trim())
+    .bind(req.admin_username.trim())
+    .bind(&hash)
+    .bind(&salt)
+    .bind(now)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "admin insert failed".to_string()))?;
+
+    Ok(Json(json!({ "ok": true })))
 }
 
 #[derive(Deserialize)]

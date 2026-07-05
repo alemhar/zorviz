@@ -1,6 +1,6 @@
 # Zorviz — Backlog Index
 
-> **Last Updated:** 2026-06-14  
+> **Last Updated:** 2026-07-05  
 > This directory tracks all remaining work and completed implementation details for the Zorviz platform.
 
 ---
@@ -27,9 +27,9 @@
 
 | Phase | Backlog | Completed | Progress |
 |---|---|---|---|
-| Phase 0 — v1 Ship Blockers & Foundation | [backlog](./phase-0-ship-blockers.md) | [completed](./phase-0-completed.md) | ~90% (10 of 13 ✅; remaining: logo upload, online-enforcement[deferred]) |
+| Phase 0 — v1 Ship Blockers & Foundation | [backlog](./phase-0-ship-blockers.md) | [completed](./phase-0-completed.md) | ~92% (11 of 13 ✅ — HTTP API/single-path done; remaining: logo upload, online-enforcement[deferred]) |
 | Phase 1 — Core Kernel | [backlog](./phase-1-backlog.md) | [completed](./phase-1-completed.md) | ~70% (5 items remaining) |
-| Phase 2 — Repair Module | [backlog](./phase-2-backlog.md) | [completed](./phase-2-completed.md) | ~80% (**full core loop intake→…→invoice→paid working**; remaining: asset detail/history, bookings, photos) |
+| Phase 2 — Repair Module | [backlog](./phase-2-backlog.md) | [completed](./phase-2-completed.md) | ~85% (**full core loop intake→…→invoice→paid + asset detail/history working**; remaining: asset edit/soft-delete, bookings, photos) |
 | Phase 3 — Commerce Module | [backlog](./phase-3-backlog.md) | [completed](./phase-3-completed.md) | ~15% (inventory search/create + part-link done via estimate; mgmt page + stock deduction remain) |
 | Phase 4 — Cloud Link | [backlog](./phase-4-backlog.md) | [completed](./phase-4-completed.md) | ~10% (8 items remaining) |
 
@@ -49,14 +49,14 @@ starting the next. Items marked *(mod)* have changed scope vs their original bac
 2. ~~**BACK-0-002** — Consolidated v1 schema migration~~ ✅ **Done** (2026-07-04 — money→centavos, customers, status enum, app_config fields, ms timestamps; verified on fresh DB boot)
 3. ~~**BACK-0-003** — First-run setup wizard~~ ✅ **Done** (2026-07-04 — 4-step wizard + setup gating; logo upload split to BACK-0-013)
 4. ~~**BACK-0-004** — Username + PIN authentication~~ ✅ **Done** (2026-07-04 — PBKDF2 PINs + lockout; LAN session binding lands with BACK-0-005)
-5. **BACK-0-005** — Local HTTP API + LAN serving *(← NEXT; largest item; foundation for all mobile views)*
+5. ~~**BACK-0-005** — Local HTTP API + LAN serving~~ ✅ **Done** (2026-07-05 — single path complete through Increment 4: wizard→`/api/setup`, `execute_sql`/invoke retired; phone-verified LAN)
 6. ~~**BACK-0-006** — Signed license + device fingerprint activation~~ ✅ **Done** (2026-07-04 — Ed25519 licenses + fingerprint + trial + read-only gating; licensegen tool)
 
 ### Tier P1 — The core money-making loop + safety
 7. ~~**BACK-0-009** — Inline-create picker pattern~~ ✅ **Done** (2026-07-04 — reusable `EntityPicker`)
 8. ~~**BACK-0-010** — Customer module (endpoints + inline create)~~ ✅ **Done** (2026-07-04)
 9. ~~**BACK-2-001** — Asset create form~~ ✅ **Done** (2026-07-04 — `+` opens New Asset dialog w/ owner picker)
-10. **BACK-2-002** — Asset detail / service history
+10. ~~**BACK-2-002** — Asset detail / service history~~ ✅ **Done** (2026-07-05 — tappable asset cards → detail page w/ specs + owner + full service history via `GET /api/assets/:id`)
 11. ~~**BACK-2-004** — Job ticket create (intake & triage)~~ ✅ **Done** (2026-07-04 — intake form + ticket detail, phone-ready)
 12. **BACK-2-011** — Photo capture on intake *(mod: kept in v1, natural via phone camera over LAN — D4)*
 13. ~~**BACK-2-005** — Estimate builder~~ ✅ **Done** (2026-07-04 — live centavo totals, parts via inline-create picker)
@@ -117,7 +117,10 @@ Follow the **Critical Path to v1** above, top-down. The immediate next actions:
 2. ~~`BACK-0-002` — Consolidated v1 schema migration~~ ✅ **Done** (2026-07-04)
 3. ~~`BACK-0-003` — First-run setup wizard~~ ✅ **Done** (2026-07-04)
 4. ~~`BACK-0-004` — Username + PIN authentication~~ ✅ **Done** (2026-07-04)
-5. `BACK-0-005` — Local HTTP API + LAN serving *(← NEXT; start early — largest item)*
+5. ~~`BACK-0-005` — Local HTTP API + LAN serving~~ ✅ **Done** (2026-07-05 — single path complete)
 
+> With the P0 foundation + the full core repair loop (through invoice→paid) + asset detail done, the
+> remaining v1 work is polish: **BACK-1-004** settings page, **BACK-2-010** bookings, **BACK-2-011** photos,
+> **BACK-2-003** asset edit/soft-delete, **BACK-0-013** logo upload.
 > Superseded the 2026-06-14 list (which started at `BACK-2-001`). Feature work now sits behind the
 > Phase 0 foundation per the v1 audit and decisions D1–D19.

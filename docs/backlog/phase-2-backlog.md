@@ -1,26 +1,8 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** ~25% Complete (Asset Create done via single-path API)  
+> **Status:** Core repair loop complete; asset detail done. Remaining: asset edit/soft-delete, bookings, photos.  
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing  
 > **Completed items live in:** [`phase-2-completed.md`](./phase-2-completed.md)
-
----
-
-## BACK-2-002 · Asset Detail / History View
-
-**Priority:** 🔴 High  
-**Area:** `apps/desktop/src/features/repair/components/`  
-**Description:**  
-Clicking an asset card in `AssetDiscovery` should open an Asset Detail view showing full specs and the complete service history (past job orders).
-
-**Acceptance Criteria:**
-- [ ] Tapping an asset card navigates to or opens an Asset Detail panel
-- [ ] Displays: all specs, owner info (if any), asset type icon
-- [ ] Service history section lists all past `orders` linked to this asset
-  - Columns: Date, Status, Total, Technician
-- [ ] `AssetRepository` gets a `getById(id)` method
-- [ ] `AssetRepository` gets a `getServiceHistory(assetId)` method querying `orders` table
-- [ ] `lastVisit` field in `AssetWithHistory` is populated from the most recent order
 
 ---
 

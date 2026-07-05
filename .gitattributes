@@ -1,0 +1,5 @@
+# SQLite migrations are checksummed by sqlx over their exact bytes. If git rewrites their
+# line endings (autocrlf), the checksum changes and the app refuses to start with
+# "migration N was previously applied but has been modified" — including on app UPDATES for
+# already-installed shops. Pin them to LF so their bytes never change across platforms.
+packages/db/migrations/**/*.sql text eol=lf
