@@ -364,3 +364,50 @@ active schedule. Zero console errors.
 - `apps/desktop/src/App.tsx` (route), `apps/desktop/src/pages/dashboard.tsx` (card)
 
 ---
+
+## ✅ BACK-2-C013 · Job-Ticket Photos + Note Threads
+
+**Completed:** 2026-07-05 — **the last v1 feature**
+**Original Backlog ID:** BACK-2-011
+**Traces to:** D4 (phone camera over LAN)
+
+**What was implemented (design finalized in a chat with the owner):**
+Photos attach to a job ticket, captured straight from a mechanic's phone camera over LAN, each with an
+append-only **note thread**. Reuses the logo `media/` upload+serve pattern (BACK-0-C013).
+
+- **Migration 0007:** `order_photos (id, order_id, path, created_by, created_at)` + `photo_notes
+  (id, photo_id, author, note, created_at)` (append-only log). Files at `media/orders/{order_id}/{uuid}.jpg`.
+- **Rust** (added to `media.rs`): `POST /api/orders/:id/photos` (any authenticated staff, incl. mechanics;
+  8 MB cap), `GET /api/orders/:id/photos` (photos newest-first, each with its notes oldest→newest),
+  `GET /api/photos/:id` (**public** — streams bytes so same-origin `<img>` works), `POST /api/photos/:id/notes`
+  (append a note; author from the session), `DELETE /api/photos/:id` (**advisor/admin only** via `require_staff`
+  — removes file + row + notes; idempotent on disk).
+- **Photos card on the Job Ticket** (`TicketPhotos.tsx`): thumbnail grid with a note-count badge; **Add Photo**
+  opens the **camera on phones** (`accept=image/* capture=environment`); tapping a thumbnail opens the photo
+  enlarged with a **Notes** thread (each note = author + timestamp, chronological) and an add-note field
+  (Enter to send). Delete button shown to advisor/admin only. Lives in the shared ticket detail, so it's in the
+  mobile My Jobs execution flow too.
+- **Client-side downscale** before upload (`downscaleImage`: canvas → longest edge ≤1600px, 0.82 JPEG) to keep
+  the shop PC lean and LAN fast; falls back to the original if canvas fails.
+- `photos-api.ts` client; reuses the exported `API_BASE` for `photoUrl`.
+
+**Permissions:** add photo + add note = any staff (admin/advisor/**mechanic**); delete photo = advisor/admin.
+Notes are append-only (never edited/deleted) so they read as an audit trail. Labeled **"Notes"** in the UI.
+
+**Verification:** builds clean; Rust recompiled in dev. curl — upload → `GET` 200 image → add note (author from
+session) → list shows note; **mechanic add photo 200 + add note 200 + delete 403**; admin delete → `GET` 404.
+Playwright — open ticket → Photos section → add photo (thumbnail count rises) → open photo → **Notes** thread →
+add a note → it appears with author; delete button visible to admin. Zero console errors.
+
+**⚠️ Notes / deviations:** implemented over the HTTP API (no Tauri fs plugin needed — works on phones too).
+`GET /api/photos/:id` is public (same-origin `<img>`, unguessable UUID). `media/` is **not** in the SQLite
+`VACUUM INTO` backup (same known limitation as the logo). Intake-form-embedded capture was not added — photos
+are added on the ticket (available immediately after intake), per the finalized design.
+
+**Key files:**
+- `packages/db/migrations/sqlite/0007_order_photos.sql`, `packages/db/src/types.ts`
+- `apps/desktop/src-tauri/src/media.rs` (photo handlers), `.../server.rs` (routes)
+- `apps/desktop/src/lib/photos-api.ts` (new), `apps/desktop/src/features/repair/components/TicketPhotos.tsx` (new)
+- `apps/desktop/src/pages/job-ticket.tsx` (Photos card)
+
+---

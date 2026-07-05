@@ -1,22 +1,10 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Core repair loop complete; asset detail done. Remaining: asset edit/soft-delete, bookings, photos.  
-> **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing  
-> **Completed items live in:** [`phase-2-completed.md`](./phase-2-completed.md)
+> **Status:** ✅ **All Phase 2 items complete** — core loop, asset detail/edit/soft-delete, lightweight
+> bookings, and job-ticket photos + note threads. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
+> **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
 
 ---
 
-## BACK-2-011 · Photo Capture & Local File Store
-
-**Priority:** 🟡 Medium  
-**Area:** `apps/desktop/src-tauri/`, `apps/desktop/src/features/repair/`  
-**Description:**  
-The intake form requires photo uploads. Photos should be saved to the local filesystem (not SQLite blobs) and referenced by path.
-
-**Acceptance Criteria:**
-- [ ] Tauri `fs` plugin used to save uploaded images to `{app_data_dir}/media/{order_id}/`
-- [ ] File paths stored as JSON array string in `orders` table (or separate `order_photos` table)
-- [ ] Photo thumbnail grid displayed in Intake form and Job Ticket detail
-- [ ] Delete photo removes file from disk and updates record
-
----
+_(No open Phase 2 items. BACK-2-011 · Photo Capture & Note Threads — ✅ completed 2026-07-05, see
+`phase-2-completed.md`.)_
