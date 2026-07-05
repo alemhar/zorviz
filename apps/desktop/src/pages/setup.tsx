@@ -2,9 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@zorviz/ui";
 import { Store, ListPlus, Coins, UserCog, Plus, Trash2 } from "lucide-react";
-import { DEV_TENANT_ID } from "@zorviz/core";
-import { db } from "../lib/db";
-import { generateSalt, hashPin } from "../lib/crypto";
+import { api } from "../lib/api";
 import { useAppConfigStore } from "../stores/app-config";
 
 type CustomField = { label: string; value: string };
@@ -80,46 +78,25 @@ export default function SetupPage() {
         setSaving(true);
         setError("");
         try {
-            const now = Date.now();
-
             const cleanCustom = customFields.filter((f) => f.label.trim());
-            const customJson = cleanCustom.length
-                ? JSON.stringify(Object.fromEntries(cleanCustom.map((f) => [f.label.trim(), f.value.trim()])))
+            const customFieldsObj = cleanCustom.length
+                ? Object.fromEntries(cleanCustom.map((f) => [f.label.trim(), f.value.trim()]))
                 : null;
 
-            await db.insertInto("app_config").values({
-                id: "default",
-                tenant_id: DEV_TENANT_ID,
-                branch_id: "main",
+            await api.post("/api/setup", {
                 shop_name: shopName.trim(),
-                device_name: "Main PC",
                 currency_symbol: currencySymbol.trim(),
                 locale: locale.trim() || "en-US",
                 tax_rate: taxRatePct.trim() ? Number(taxRatePct) / 100 : null,
                 address: address.trim() || null,
                 contact_phone: contactPhone.trim() || null,
                 contact_email: contactEmail.trim() || null,
-                logo_path: null, // logo upload deferred (BACK-0-003 follow-up)
                 tax_registration_id: taxRegId.trim() || null,
-                custom_fields: customJson,
-                created_at: now,
-                updated_at: now,
-            }).execute();
-
-            const salt = generateSalt();
-            const pinHash = await hashPin(pin, salt);
-            await db.insertInto("users").values({
-                id: crypto.randomUUID(),
-                name: adminName.trim(),
-                username: username.trim(),
-                pin_hash: pinHash,
-                pin_salt: salt,
-                role: "admin",
-                email: null,
-                is_active: 1,
-                created_at: now,
-                updated_at: now,
-            }).execute();
+                custom_fields: customFieldsObj,
+                admin_name: adminName.trim(),
+                admin_username: username.trim(),
+                admin_pin: pin,
+            });
 
             await fetchConfig();
             navigate("/login");

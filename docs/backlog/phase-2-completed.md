@@ -247,3 +247,36 @@ canonical D19 flow), not the original spec's `billed`.
 - `apps/desktop/package.json` (jspdf)
 
 ---
+
+## ✅ BACK-2-C010 · Asset Detail & Service History
+
+**Completed:** 2026-07-05
+**Original Backlog ID:** BACK-2-002
+
+**What was implemented:**
+- Rust `GET /api/assets/:id` (`api_data::get_asset`) — returns the asset with `specs` parsed to an object,
+  the `owner` (customer, if any), and a `history[]` of every `order` linked to the asset (newest first),
+  each row carrying status, customer complaint, total (centavos), created date, and assigned technician name.
+- **Asset Detail page** (`pages/asset-detail.tsx`, route `/repair/asset/:id`): asset type icon + label, a
+  spec grid (all `specs` key/values, human-cased labels), owner block, and a **Service History** list of past
+  tickets (date, status badge, complaint, formatted total) — each row taps through to the ticket detail.
+- **AssetDiscovery** cards are now tappable → navigate to the detail page; the "New Ticket" button on a card
+  calls `e.stopPropagation()` so it doesn't also trigger the card navigation.
+- `repair-api.ts`: `getAsset(id)` + `AssetDetail` / `ServiceHistoryItem` types.
+
+**Verification:** cargo check + vite build clean; curl `GET /api/assets/:id` returned the vehicle with parsed
+specs (plate ABC-1234) + `history` containing the triage ticket ("history test complaint"); Playwright browser
+flow (search → tap asset card → URL becomes `/#/repair/asset/:id` → page shows Plate Number + Service History +
+the ticket row with date/total/Triage status) passed with zero console errors.
+
+**⚠️ Deviation from original spec:** data access is the HTTP API (`get_asset`), **not** TS
+`AssetRepository.getById` / `getServiceHistory` methods (those repo methods were not added) — per the
+single-path architecture (D23). `lastVisit` is expressed implicitly via the newest history row rather than a
+dedicated `AssetWithHistory.lastVisit` field.
+
+**Key files:**
+- `apps/desktop/src-tauri/src/api_data.rs` (`get_asset`), `apps/desktop/src-tauri/src/server.rs` (route)
+- `apps/desktop/src/pages/asset-detail.tsx` (new), `apps/desktop/src/App.tsx` (route)
+- `apps/desktop/src/features/repair/components/AssetDiscovery.tsx`, `apps/desktop/src/lib/repair-api.ts`
+
+---

@@ -342,3 +342,52 @@ auth for now; LAN session binding lands with the HTTP API + LAN serving item.
 - `apps/desktop/src/lib/customers-api.ts`
 
 ---
+
+## ✅ BACK-0-C005 · Local HTTP API + LAN Serving (Single Path)
+
+**Completed:** 2026-07-05 (all 4 increments) — **the foundation for every LAN/mobile view**
+**Original Backlog ID:** BACK-0-005
+**Traces to:** D1, D23
+
+**What was implemented (across 4 increments):**
+- **Increment 1 — auth foundation.** Rust `auth.rs`: PBKDF2 verify (parity with the node seeder), in-memory
+  sessions with 12h opaque bearer tokens, 5-attempt/30s lockout; `POST /api/login`, `POST /api/logout`,
+  `GET /api/me`. Frontend `api.ts` client (base-URL detection + 401→logout); auth store moved off client-side
+  Kysely to the API.
+- **Increment 2 — LAN serving + hardening.** axum serves the built SPA (embedded via rust-embed; disk in
+  debug, in-binary in release) as the `/` fallback; CORS locked to desktop origins (tauri.localhost +
+  localhost) via predicate (no wildcard); best-effort Windows Firewall rule for TCP 3030.
+- **Increment 3 — first data endpoints + frontend migration.** `api_data.rs` with NULL-safe `row_to_json` +
+  `specs` JSON expansion; `GET /api/config` (public), `GET/POST /api/assets`. Frontend read paths moved off
+  `invoke` to HTTP.
+- **Increment 4 — single path complete.** Setup wizard migrated to `POST /api/setup` (`api_data::setup`,
+  guarded by no-existing-config; PIN hashed in Rust). **Removed** the `invoke('execute_sql')` command + Rust
+  handler and deleted the dead frontend DB layer (`lib/db.ts`, `lib/tauri-dialect.ts`, `lib/crypto.ts`). There
+  is now exactly **one data path** — the Rust/axum HTTP API — shared by the desktop webview and LAN devices; no
+  browser-only dependency remains.
+- Over Phase 2 the API grew the full typed surface (orders, order_items, customers, inventory, users, license,
+  backups) — no raw SQL is ever sent over the network.
+
+**Verification:** **physical phone (2026-07-04)** loaded the app from the desktop over LAN and logged in against
+the Rust API (real hardware, all increments). Increment 4 verified in a plain non-Tauri browser: fresh-DB setup
+wizard → login → create asset → create ticket all succeed over HTTP with zero console errors. curl checks per
+increment (auth 401/token, CORS allow/reject, config nulls, asset CRUD).
+
+**⚠️ Partial / ongoing (not blockers):**
+- Mobile-first polish: the mechanic **My Jobs** view is mobile-first (~430px, ≥44px targets); a full audit of
+  *every* view for touch sizing is ongoing, not gating.
+- Per-endpoint input validation is added as each endpoint is built rather than via a single shared validator.
+
+**Related bug fixed during this work:** migration checksum instability from CRLF line endings — sqlx
+`migrate!` checksums the raw bytes, so git's autocrlf conversion silently changed them and would fail app
+startup ("migration N was modified") on any machine that checked out CRLF. Fixed by pinning
+`packages/db/migrations/**/*.sql` to `eol=lf` in `.gitattributes` and renormalizing the files. This is a real
+production-update safety fix, not cosmetic.
+
+**Key files:**
+- `apps/desktop/src-tauri/src/{auth.rs, api_data.rs, server.rs, db.rs, lib.rs}`
+- `apps/desktop/src/lib/api.ts`, `apps/desktop/src/pages/setup.tsx`, `apps/desktop/src/stores/*`
+- **Deleted:** `apps/desktop/src/lib/{db.ts, tauri-dialect.ts, crypto.ts}`; Rust `execute_sql` command
+- `.gitattributes` (migration line-ending pin)
+
+---

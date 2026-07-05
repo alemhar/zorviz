@@ -100,11 +100,13 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
         .route("/api/logout", post(auth::logout))
         .route("/api/me", get(auth::me))
         .route("/api/config", get(api_data::get_config))
+        .route("/api/setup", post(api_data::setup))
         .route("/api/stats", get(api_data::get_stats))
         .route(
             "/api/assets",
             get(api_data::search_assets).post(api_data::create_asset),
         )
+        .route("/api/assets/:id", get(api_data::get_asset))
         .route(
             "/api/customers",
             get(api_data::search_customers).post(api_data::create_customer),
@@ -166,7 +168,7 @@ async fn license_gate(req: Request, next: Next) -> Response {
     let path = req.uri().path();
     // Auth + license install + data-safety ops (backup/restore) are always allowed — even
     // read-only (D24): the shop can always export/recover its own data.
-    let exempt = matches!(path, "/api/login" | "/api/logout" | "/api/license" | "/api/restore" | "/api/backup-dir")
+    let exempt = matches!(path, "/api/login" | "/api/logout" | "/api/license" | "/api/setup" | "/api/restore" | "/api/backup-dir")
         || path.starts_with("/api/backup");
 
     if mutating && path.starts_with("/api/") && !exempt {

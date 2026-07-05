@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { searchAssets } from "../../../lib/repair-api";
 import { AssetWithHistory } from "@zorviz/feature-repair";
 import { Input, Button, Card, CardHeader, CardContent } from "@zorviz/ui";
@@ -13,6 +14,7 @@ export function AssetDiscovery() {
     const [loading, setLoading] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [intakeAsset, setIntakeAsset] = useState<AssetWithHistory | null>(null);
+    const navigate = useNavigate();
 
     // Debounced search (simplified)
     useEffect(() => {
@@ -65,7 +67,7 @@ export function AssetDiscovery() {
             {/* Results List */}
             <div className="space-y-3 pb-20">
                 {results.map((asset) => (
-                    <Card key={asset.id} className="active:scale-95 transition-transform cursor-pointer">
+                    <Card key={asset.id} className="active:scale-95 transition-transform cursor-pointer" onClick={() => navigate(`/repair/asset/${asset.id}`)}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <div className="flex items-center gap-2 font-semibold">
                                 {getIcon(asset.type)}
@@ -86,7 +88,7 @@ export function AssetDiscovery() {
                                 <div className="text-xs text-muted-foreground">
                                     Last Visit: {asset.lastVisit ? new Date(asset.lastVisit).toLocaleDateString() : 'Never'}
                                 </div>
-                                <Button size="sm" variant="outline" onClick={() => setIntakeAsset(asset)}>
+                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setIntakeAsset(asset); }}>
                                     <ClipboardList className="h-4 w-4 mr-1" /> New Ticket
                                 </Button>
                             </div>
