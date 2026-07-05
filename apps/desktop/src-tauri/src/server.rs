@@ -127,6 +127,12 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
             get(media::get_logo).post(media::upload_logo).delete(media::delete_logo),
         )
         .route(
+            "/api/orders/:id/photos",
+            get(media::list_photos).post(media::upload_photo),
+        )
+        .route("/api/photos/:id", get(media::get_photo).delete(media::delete_photo))
+        .route("/api/photos/:id/notes", post(media::add_note))
+        .route(
             "/api/assets",
             get(api_data::search_assets).post(api_data::create_asset),
         )

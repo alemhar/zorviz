@@ -216,6 +216,25 @@ export type AssetType = Selectable<AssetTypesTable>;
 export type NewAssetType = Insertable<AssetTypesTable>;
 export type AssetTypeUpdate = Updateable<AssetTypesTable>;
 
+// BACK-2-011: job-ticket photos + append-only per-photo note threads. Files live under
+// {data_dir}/media/orders/{order_id}/; the DB holds only paths + metadata.
+export interface OrderPhotosTable {
+    id: string;
+    order_id: string;
+    path: string;
+    created_by: Nullable<string>;
+    created_at: number;
+}
+export interface PhotoNotesTable {
+    id: string;
+    photo_id: string;
+    author: Nullable<string>;
+    note: string;
+    created_at: number;
+}
+export type OrderPhoto = Selectable<OrderPhotosTable>;
+export type PhotoNote = Selectable<PhotoNotesTable>;
+
 export interface Database {
     users: UsersTable;
     customers: CustomersTable;
@@ -227,4 +246,6 @@ export interface Database {
     orders: OrdersTable;
     order_items: OrderItemsTable;
     inventory: InventoryTable;
+    order_photos: OrderPhotosTable;
+    photo_notes: PhotoNotesTable;
 }

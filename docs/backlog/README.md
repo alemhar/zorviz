@@ -29,7 +29,7 @@
 |---|---|---|---|
 | Phase 0 — v1 Ship Blockers & Foundation | [backlog](./phase-0-ship-blockers.md) | [completed](./phase-0-completed.md) | ~99% (12 of 13 ✅ — only online-enforcement remains, deferred fast-follow) |
 | Phase 1 — Core Kernel | [backlog](./phase-1-backlog.md) | [completed](./phase-1-completed.md) | ~80% (settings + **data-driven asset types** done; 4 items remaining, mostly deferred: schema split, module registry, user-mgmt UI, hardware IO) |
-| Phase 2 — Repair Module | [backlog](./phase-2-backlog.md) | [completed](./phase-2-completed.md) | ~95% (**core loop + asset detail/edit/soft-delete + lightweight bookings working**; remaining: photos) |
+| Phase 2 — Repair Module | [backlog](./phase-2-backlog.md) | [completed](./phase-2-completed.md) | ✅ **100%** (core loop, asset detail/edit/soft-delete, lightweight bookings, and job-ticket photos + note threads) |
 | Phase 3 — Commerce Module | [backlog](./phase-3-backlog.md) | [completed](./phase-3-completed.md) | ~15% (inventory search/create + part-link done via estimate; mgmt page + stock deduction remain) |
 | Phase 4 — Cloud Link | [backlog](./phase-4-backlog.md) | [completed](./phase-4-completed.md) | ~10% (8 items remaining) |
 
@@ -58,7 +58,7 @@ starting the next. Items marked *(mod)* have changed scope vs their original bac
 9. ~~**BACK-2-001** — Asset create form~~ ✅ **Done** (2026-07-04 — `+` opens New Asset dialog w/ owner picker)
 10. ~~**BACK-2-002** — Asset detail / service history~~ ✅ **Done** (2026-07-05 — tappable asset cards → detail page w/ specs + owner + full service history via `GET /api/assets/:id`)
 11. ~~**BACK-2-004** — Job ticket create (intake & triage)~~ ✅ **Done** (2026-07-04 — intake form + ticket detail, phone-ready)
-12. **BACK-2-011** — Photo capture on intake *(mod: kept in v1, natural via phone camera over LAN — D4)*
+12. ~~**BACK-2-011** — Photo capture~~ ✅ **Done** (2026-07-05 — ticket photos via phone camera over LAN + append-only note threads; delete = advisor/admin)
 13. ~~**BACK-2-005** — Estimate builder~~ ✅ **Done** (2026-07-04 — live centavo totals, parts via inline-create picker)
 14. **BACK-3-001..004** — Basic inventory *(search/create done via estimate; full mgmt page remaining)*
 15. **BACK-3-006** — Parts linking + stock deduction on approval *(link column done; deduction pending)*
@@ -120,7 +120,9 @@ Follow the **Critical Path to v1** above, top-down. The immediate next actions:
 5. ~~`BACK-0-005` — Local HTTP API + LAN serving~~ ✅ **Done** (2026-07-05 — single path complete)
 
 > With the P0 foundation + the full core repair loop (through invoice→paid) + asset detail done, the
-> remaining v1 work: **BACK-2-011** photos (needs a design chat). (Done 2026-07-05: **BACK-1-006** data-driven
-> asset types, **BACK-2-010** lightweight bookings, **BACK-0-013** shop logo upload.)
+> **All v1 features are complete** (2026-07-05: **BACK-1-006** data-driven asset types, **BACK-2-010**
+> lightweight bookings, **BACK-0-013** shop logo upload, **BACK-2-011** ticket photos + note threads). What
+> remains is the **pre-ship checklist**: swap the dev license key for a production key, test the installer on a
+> clean machine, add the installer firewall rule. Deferred fast-follow: **BACK-0-012** online kill-switch.
 > Superseded the 2026-06-14 list (which started at `BACK-2-001`). Feature work now sits behind the
 > Phase 0 foundation per the v1 audit and decisions D1–D19.

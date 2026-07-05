@@ -9,6 +9,7 @@ import { StatusBadge } from "../components/status-badge";
 import { EstimateBuilder } from "../features/repair/components/EstimateBuilder";
 import { ApprovalDialog } from "../features/repair/components/ApprovalDialog";
 import { AssignDialog } from "../features/repair/components/AssignDialog";
+import { TicketPhotos } from "../features/repair/components/TicketPhotos";
 import { useAppConfigStore } from "../stores/app-config";
 
 function assetTitle(asset?: JobTicket["asset"]): string {
@@ -139,6 +140,8 @@ export default function JobTicketPage() {
                                 </CardContent>
                             </Card>
                         )}
+
+                        <TicketPhotos orderId={ticket.id} />
 
                         <Card>
                             <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
