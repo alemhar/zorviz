@@ -17,6 +17,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use crate::api_data;
+use crate::asset_types;
 use crate::auth::{self, ApiState, AuthState};
 
 const PORT: u16 = 3030;
@@ -105,6 +106,15 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
         )
         .route("/api/setup", post(api_data::setup))
         .route("/api/stats", get(api_data::get_stats))
+        .route("/api/asset-type-templates", get(asset_types::get_templates))
+        .route(
+            "/api/asset-types",
+            get(asset_types::list_asset_types).post(asset_types::create_asset_type),
+        )
+        .route(
+            "/api/asset-types/:id",
+            axum::routing::put(asset_types::update_asset_type).delete(asset_types::delete_asset_type),
+        )
         .route(
             "/api/assets",
             get(api_data::search_assets).post(api_data::create_asset),

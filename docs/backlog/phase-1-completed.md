@@ -208,3 +208,60 @@ not editable (identity columns).
 - `apps/desktop/src/App.tsx` (route), `apps/desktop/src/pages/dashboard.tsx` (card enabled)
 
 ---
+
+## ✅ BACK-1-C009 · Shop Asset-Type Configuration (data-driven types + fields)
+
+**Completed:** 2026-07-05
+**Original Backlog ID:** BACK-1-006
+**Traces to:** the CLAUDE.md core rule (keep the core domain-agnostic — no hardcoded car/mechanic)
+
+**What was implemented:**
+Made asset types **data-driven** — removed the last domain hardcoding (the `SPEC_FIELDS`/`SPEC_LABELS`/`TYPES`
+maps in the UI). A shop now defines its own asset types and fields; the former built-ins ship as templates.
+
+- **DB:** migration `0005_asset_types.sql` — `asset_types(id, tenant_id, key, name, icon, fields JSON,
+  show_on_create, sort_order, timestamps)` + unique `(tenant_id, key)`. `assets.type` stores the type's stable
+  `key` (existing rows' `vehicle/gadget/appliance` reuse the seeded template keys, so nothing breaks). The
+  migration back-compat-seeds the 3 templates for installs that already have an `app_config` (INSERT…SELECT →
+  no-op on a fresh DB).
+- **Rust** (`asset_types.rs`): `builtin_templates()` (single source of truth), `GET /api/asset-type-templates`
+  (public — used by the wizard pre-login), `GET /api/asset-types` (auth), `POST/PUT/DELETE /api/asset-types`
+  (admin-only). Field defs are `{key,label,kind:'text'|'number',required}`; `key` is slugified from the label
+  and kept unique per tenant; type `key` is immutable on update (it links assets). `setup` accepts the wizard's
+  selected types (defaults to all 3 templates); `lib.rs` also seeds built-ins for pre-feature installs missing
+  types.
+- **Onboarding:** new wizard step "What You Service" — tick starter templates (all pre-checked) → seeds the
+  shop's `asset_types`.
+- **Settings:** admin-only "Asset Types" editor — add/rename type, pick an icon, add/remove/reorder fields
+  (label + kind + required), and a per-type **"Show when creating a ticket"** toggle. Read-only for non-admins.
+- **Create form** is now data-driven: offers only types with `show_on_create=1` (one → no picker; many →
+  limited picker); renders fields from the type def (`number` → numeric input, `required` → blocks save).
+- **Detail + edit** render labels/order from the matched type def; fall back to raw spec keys for a removed
+  type. Asset type is immutable on edit (BACK-2-C011).
+- Widened `assets.type` and `CreateAssetInput.type` to `string`; added the `asset_types` interface to the
+  Kysely `Database` type (kept in sync per convention).
+
+**Access / D24:** type writes are admin-only (401/403 verified). Toggling a type off or deleting it never
+hides existing assets or their history — only new-asset creation is affected.
+
+**Verification:** tsc + vite build clean; Rust recompiled in dev. curl — templates, migration back-compat seed
+(3 types on the pre-existing DB), 401/403 guards, create (slugified keys), toggle, delete. Playwright on a
+**fresh DB**: onboarding unchecks Appliance → only Vehicle+Gadget seeded → create picker excludes Appliance →
+create Vehicle (fields from def) → detail shows "Plate Number"/"Vehicle" → edit → Settings adds a custom
+**Bicycle** type with a **required** "Frame Size" field → toggles **Gadget off** → create picker then shows
+Vehicle+Bicycle (no Gadget), enforces the required field, and the Bicycle asset's detail renders the custom
+"Frame Size" label. Zero console errors throughout.
+
+**⚠️ Deferred (noted in the spec):** dropdown/select and date field kinds; richer icon set. Data access is the
+HTTP API (D23), not Kysely.
+
+**Key files:**
+- `packages/db/migrations/sqlite/0005_asset_types.sql`, `packages/db/src/types.ts`,
+  `packages/features/repair/src/types.ts`
+- `apps/desktop/src-tauri/src/asset_types.rs` (new), `.../api_data.rs` (setup seeding + pub helpers),
+  `.../server.rs` (routes), `.../lib.rs` (module + back-compat seed)
+- `apps/desktop/src/lib/asset-types-api.ts` (new), `apps/desktop/src/lib/asset-icons.ts` (new)
+- `apps/desktop/src/features/repair/components/{AssetCreateForm,AssetEditForm,AssetTypesSettings}.tsx`
+- `apps/desktop/src/pages/{setup,settings,asset-detail}.tsx`
+
+---

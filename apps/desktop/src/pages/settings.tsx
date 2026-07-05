@@ -4,6 +4,7 @@ import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from "
 import { ArrowLeft, Store, Coins, Monitor, ListPlus, Plus, Trash2 } from "lucide-react";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
+import { AssetTypesSettings } from "../features/repair/components/AssetTypesSettings";
 
 type CustomField = { label: string; value: string };
 
@@ -202,6 +203,8 @@ export default function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                <AssetTypesSettings readOnly={ro} />
 
                 <Card>
                     <CardHeader className="flex-row items-center gap-2 space-y-0">

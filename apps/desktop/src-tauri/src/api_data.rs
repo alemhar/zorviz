@@ -16,12 +16,12 @@ use std::collections::HashMap;
 
 use crate::auth::{session_from_headers, ApiState};
 
-fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
 // Single source of truth for tenant_id: read it from app_config (falls back to the dev value).
-async fn tenant_id(state: &ApiState) -> String {
+pub(crate) async fn tenant_id(state: &ApiState) -> String {
     sqlx::query("SELECT tenant_id FROM app_config WHERE id = 'default' LIMIT 1")
         .fetch_optional(&state.pool)
         .await
@@ -44,7 +44,7 @@ async fn tax_rate(state: &ApiState) -> f64 {
 }
 
 // Generic row -> JSON object (INTEGER -> number, REAL -> number, TEXT -> string, NULL -> null).
-fn row_to_json(row: &SqliteRow) -> Map<String, Value> {
+pub(crate) fn row_to_json(row: &SqliteRow) -> Map<String, Value> {
     let mut map = Map::new();
     for col in row.columns() {
         let name = col.name();
@@ -67,7 +67,7 @@ fn row_to_json(row: &SqliteRow) -> Map<String, Value> {
 }
 
 // Parse a stored JSON-string column into a nested object/array in place.
-fn parse_json_field(obj: &mut Map<String, Value>, field: &str) {
+pub(crate) fn parse_json_field(obj: &mut Map<String, Value>, field: &str) {
     if let Some(Value::String(s)) = obj.get(field) {
         if let Ok(parsed) = serde_json::from_str::<Value>(s) {
             obj.insert(field.to_string(), parsed);
@@ -703,6 +703,9 @@ pub struct SetupReq {
     admin_name: String,
     admin_username: String,
     admin_pin: String,
+    // Asset types the shop selected during onboarding (BACK-1-006). If omitted/empty, the
+    // three built-in templates are seeded so the app is usable out of the box.
+    asset_types: Option<Vec<crate::asset_types::AssetTypeInput>>,
 }
 
 /// POST /api/setup — first-run setup: create app_config + the first admin. Unauthenticated by
@@ -767,6 +770,18 @@ pub async fn setup(
     .execute(&state.pool)
     .await
     .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "admin insert failed".to_string()))?;
+
+    // Seed the shop's asset types (BACK-1-006). tenant_id matches the app_config insert above.
+    match req.asset_types {
+        Some(types) if !types.is_empty() => {
+            for (i, t) in types.iter().enumerate() {
+                let _ = crate::asset_types::insert_type(&state.pool, "dev-tenant", t, i as i64).await;
+            }
+        }
+        _ => {
+            let _ = crate::asset_types::seed_builtins(&state.pool, "dev-tenant").await;
+        }
+    }
 
     Ok(Json(json!({ "ok": true })))
 }
@@ -990,7 +1005,7 @@ pub async fn list_users(
 }
 
 // Require an admin/owner session. Returns Err(status) otherwise.
-fn require_admin(state: &ApiState, headers: &HeaderMap) -> Result<(), StatusCode> {
+pub(crate) fn require_admin(state: &ApiState, headers: &HeaderMap) -> Result<(), StatusCode> {
     match session_from_headers(state, headers) {
         None => Err(StatusCode::UNAUTHORIZED),
         Some(s) if s.role == "admin" || s.role == "owner" => Ok(()),

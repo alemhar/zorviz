@@ -94,7 +94,7 @@ export interface AssetsTable {
     id: string;
     tenant_id: string;
     owner_id: Nullable<string>; // references customers(id)
-    type: 'vehicle' | 'gadget' | 'appliance';
+    type: string; // stable asset-type key from asset_types (data-driven, BACK-1-006)
     specs: string; // JSON string
     created_at: number;
     updated_at: number;
@@ -191,12 +191,33 @@ export type InventoryItemUpdate = Updateable<InventoryTable>;
 // Database Schema
 // ============================================
 
+// BACK-1-006: data-driven shop asset types. `fields` is a JSON string:
+// [{ key, label, kind: 'text' | 'number', required: boolean }]. `key` is the stable
+// slug stored in assets.type. Access is via the HTTP API (single path), not Kysely —
+// this interface is kept in sync per convention.
+export interface AssetTypesTable {
+    id: string;
+    tenant_id: string;
+    key: string;
+    name: string;
+    icon: Nullable<string>;
+    fields: string; // JSON array of field defs
+    show_on_create: number; // 0 | 1
+    sort_order: number;
+    created_at: number;
+    updated_at: number;
+}
+export type AssetType = Selectable<AssetTypesTable>;
+export type NewAssetType = Insertable<AssetTypesTable>;
+export type AssetTypeUpdate = Updateable<AssetTypesTable>;
+
 export interface Database {
     users: UsersTable;
     customers: CustomersTable;
     sync_metadata: SyncMetadataTable;
     app_config: AppConfigTable;
     assets: AssetsTable;
+    asset_types: AssetTypesTable;
     bookings: BookingsTable;
     orders: OrdersTable;
     order_items: OrderItemsTable;

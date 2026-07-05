@@ -13,33 +13,26 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@zorviz/ui";
-import { ArrowLeft, Car, Smartphone, Package, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { formatMoney } from "@zorviz/core";
 import { getAsset, deleteAsset, type AssetDetail } from "../lib/repair-api";
+import { listAssetTypes, type AssetType, type FieldDef } from "../lib/asset-types-api";
 import { ApiError } from "../lib/api";
+import { iconFor } from "../lib/asset-icons";
 import { StatusBadge } from "../components/status-badge";
 import { AssetEditForm } from "../features/repair/components/AssetEditForm";
 import { useAppConfigStore } from "../stores/app-config";
 
-const TYPE_ICON: Record<string, typeof Car> = { vehicle: Car, gadget: Smartphone, appliance: Package };
-
-// Human labels for common spec keys; anything else falls back to the raw key.
-const SPEC_LABELS: Record<string, string> = {
-    plateNumber: "Plate Number",
-    vin: "VIN",
-    make: "Make",
-    model: "Model",
-    year: "Year",
-    color: "Color",
-    mileage: "Mileage",
-    brand: "Brand",
-    serialNumber: "Serial Number",
-    imei: "IMEI",
-};
-
-function assetTitle(a: AssetDetail): string {
-    const s = a.specs as Record<string, string>;
-    return s.plateNumber || s.serialNumber || s.imei || [s.make, s.model].filter(Boolean).join(" ") || "Asset";
+// A display label for the asset: first filled field (in the type's field order), else
+// the first non-empty spec value, else a generic label.
+function assetTitle(a: AssetDetail, fields: FieldDef[]): string {
+    const s = a.specs as Record<string, unknown>;
+    for (const f of fields) {
+        const v = s[f.key];
+        if (v !== null && v !== undefined && String(v).trim()) return String(v);
+    }
+    const first = Object.values(s).find((v) => v !== null && v !== undefined && String(v).trim());
+    return first ? String(first) : "Asset";
 }
 
 export default function AssetDetailPage() {
@@ -47,6 +40,7 @@ export default function AssetDetailPage() {
     const navigate = useNavigate();
     const currency = useAppConfigStore((s) => s.config?.currency_symbol ?? "");
     const [asset, setAsset] = useState<AssetDetail | null>(null);
+    const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
     const [error, setError] = useState("");
     const [editOpen, setEditOpen] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -61,6 +55,11 @@ export default function AssetDetailPage() {
     useEffect(() => {
         load();
     }, [load]);
+
+    // Load the shop's asset types once, to render labels/icon from the matching definition.
+    useEffect(() => {
+        listAssetTypes().then(setAssetTypes).catch(() => {});
+    }, []);
 
     const doDelete = async () => {
         if (!id) return;
@@ -78,9 +77,18 @@ export default function AssetDetailPage() {
         }
     };
 
-    const Icon = asset ? TYPE_ICON[asset.type] ?? Package : Package;
-    const specEntries = asset
-        ? Object.entries(asset.specs).filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
+    const matchedType = asset ? assetTypes.find((t) => t.key === asset.type) ?? null : null;
+    const Icon = iconFor(matchedType?.icon);
+    // Spec rows to show: driven by the type's field defs (label + order); fall back to the
+    // asset's raw spec keys when the type was removed. Empty values are skipped.
+    const specRows: { label: string; value: string }[] = asset
+        ? matchedType
+            ? matchedType.fields
+                  .map((f) => ({ label: f.label, value: String((asset.specs as Record<string, unknown>)[f.key] ?? "") }))
+                  .filter((r) => r.value.trim() !== "")
+            : Object.entries(asset.specs)
+                  .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
+                  .map(([k, v]) => ({ label: k, value: String(v) }))
         : [];
 
     return (
@@ -112,11 +120,11 @@ export default function AssetDetailPage() {
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-base">
                                     <Icon className="w-5 h-5" />
-                                    {assetTitle(asset)}
+                                    {assetTitle(asset, matchedType?.fields ?? [])}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="text-sm space-y-1">
-                                <div className="capitalize text-muted-foreground">{asset.type}</div>
+                                <div className="capitalize text-muted-foreground">{matchedType?.name ?? asset.type}</div>
                                 {asset.owner && (
                                     <div>
                                         Owner: {asset.owner.name}
@@ -124,10 +132,10 @@ export default function AssetDetailPage() {
                                     </div>
                                 )}
                                 <div className="pt-2 grid grid-cols-2 gap-x-4 gap-y-1">
-                                    {specEntries.map(([k, v]) => (
-                                        <div key={k} className="flex flex-col">
-                                            <span className="text-xs text-muted-foreground">{SPEC_LABELS[k] ?? k}</span>
-                                            <span>{String(v)}</span>
+                                    {specRows.map((r) => (
+                                        <div key={r.label} className="flex flex-col">
+                                            <span className="text-xs text-muted-foreground">{r.label}</span>
+                                            <span>{r.value}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -176,6 +184,7 @@ export default function AssetDetailPage() {
                     open={editOpen}
                     onOpenChange={setEditOpen}
                     asset={asset}
+                    assetType={matchedType}
                     onUpdated={() => load()}
                 />
             )}
