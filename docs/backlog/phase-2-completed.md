@@ -412,3 +412,77 @@ DB-only backups don't include them, but the **Full Backup** (BACK-0-C008 update,
 - `apps/desktop/src/pages/job-ticket.tsx` (Photos card)
 
 ---
+
+## ✅ BACK-2-C014 · BIR-style Job Order document fields
+
+**Completed:** 2026-07-05
+**Origin:** analysis of a real PH client form — `docs/clients/HerselJobOrder.jpg` (Hersel Car Airconditioning
+Services, Davao). Matches our printout to what shops already hand customers.
+
+**What was implemented (migration 0008):**
+- **Shop identity (config):** `proprietor`, `business_style`, `vat_status` ('vat' | 'non_vat' | null),
+  `document_title` (printout title; null → "Invoice"), `terms_and_conditions` (printed T&C block). Edited in
+  **Settings** (admin) — Shop Details gains proprietor/business style/tax-status; a new "Printed Document" card
+  holds the title + T&C. **Blank fields are never printed** (no empty lines) — the owner's rule.
+- **Per-order:** `orders.job_order_no` (the shop's pre-printed paper serial, e.g. "3298") + `orders.terms`
+  (payment terms, e.g. "COD"), captured on the **Intake** form (optional).
+- **Per-line:** `order_items.unit` (pc/set/L/hrs) — the UNIT column, entered in the **Estimate** builder.
+- **Invoice/Job Order PDF** rewritten: configurable title; conditional header (proprietor, VAT+TIN, business
+  style, address, contact, custom fields — each only if set); Job Order No. + Terms in the meta; a **UNIT**
+  column; a **Terms & Conditions** block; and **Prepared by / Conformed** signature lines. Filename follows the
+  document title (`job-order-INV-00001.pdf`).
+
+**Deliberately NOT done (BIR compliance):** the app's PDF is an **internal/working copy**, not an official
+BIR receipt. A computer-generated OR needs its own BIR CAS/POS accreditation (a regulatory project) — out of
+scope. The shop keeps using their BIR-authorized paper pad; we record its `job_order_no` to link paper↔digital.
+Senior-citizen/PWD (OSCA/PWD) discount + VAT-exemption was scoped as a **separate future feature** (needs its
+own design chat).
+
+**Verification:** builds clean; Rust recompiled; migration 0008 applied. curl — config BIR fields persist;
+order with `job_order_no`/`terms`; estimate items with `unit`. Playwright — Settings hydrates the new fields;
+Intake shows Job Order No. + Terms; **the PDF generates** (downloaded `job-order-INV-00001.pdf`, no throw).
+Zero console errors.
+
+**Key files:**
+- `packages/db/migrations/sqlite/0008_bir_doc_fields.sql`, `packages/db/src/types.ts`
+- `apps/desktop/src-tauri/src/api_data.rs` (config/order/estimate), `apps/desktop/src/lib/invoice-pdf.ts`
+- `apps/desktop/src/pages/settings.tsx`, `apps/desktop/src/stores/app-config.ts`, `apps/desktop/src/lib/orders-api.ts`
+- `apps/desktop/src/features/repair/components/{IntakeForm,EstimateBuilder}.tsx`
+- `docs/clients/HerselJobOrder.jpg` (reference)
+
+---
+
+## ✅ BACK-2-C015 · Senior/PWD discount + adjustable discounts
+
+**Completed:** 2026-07-05
+**Origin:** the OSCA/PWD ID field on the Hersel job order + owner request to adjust discounts at billing.
+
+**What was implemented (migration 0009):**
+- **Senior/PWD statutory discount** (PH: RA 9994 / RA 10754) — **fixed 20% off + VAT-exempt**, with the
+  **OSCA/PWD ID** recorded. `orders` gains `senior_pwd_type` ('senior'|'pwd'|null), `senior_pwd_id`, and a
+  computed `senior_discount` (centavos). Since our prices are VAT-exclusive, applying it sets **tax → 0** and a
+  **20% × subtotal** discount line — correct for both Non-VAT shops (no VAT anyway) and VAT shops (VAT zeroed).
+- **Shared server math** (`compute_totals`) used by both entry points so the numbers are identical.
+- **Editable at two stages** (owner request): (1) **Estimate builder** — Senior/PWD select + ID, live totals;
+  (2) **final/billing stage** — a new **Discounts editor** (`DiscountsDialog`) on the done ticket that adjusts
+  the **manual discount** and **senior/PWD** and recomputes from the stored subtotal. Both are **admin/advisor
+  only** (`require_staff`; mechanics 403) — the manual-discount capture the owner also asked for.
+- New `POST /api/orders/:id/discounts`; `save_estimate` also carries the senior fields.
+- **Printout:** OSCA/PWD ID No. line under the asset, a "Senior/PWD Disc. (20%)" total line, and Tax shown as
+  "(VAT-exempt)" when applied.
+
+**Verification:** builds clean; migration 0009 applied. curl — no-senior: 12% tax; **senior: tax 0 + 20%
+disc**; discounts endpoint (final stage) switches senior type + stacks a manual discount and recomputes;
+**mechanic 403**. Playwright — EstimateBuilder Senior toggle shows the 20% line + VAT-exempt; final-stage
+Discounts editor applies PWD and the billing card reflects it; PDF generates. Zero console errors.
+
+**Note:** 20% is hardcoded (statutory). This is a discount + VAT-exemption on the working document — not a claim
+of BIR compliance (see BACK-2-C014).
+
+**Key files:**
+- `packages/db/migrations/sqlite/0009_senior_pwd_discount.sql`, `packages/db/src/types.ts`
+- `apps/desktop/src-tauri/src/api_data.rs` (`compute_totals`, `save_estimate`, `set_discounts`), `.../server.rs`
+- `apps/desktop/src/lib/orders-api.ts`, `apps/desktop/src/features/repair/components/{EstimateBuilder,DiscountsDialog}.tsx` (new)
+- `apps/desktop/src/pages/job-ticket.tsx`, `apps/desktop/src/lib/invoice-pdf.ts`
+
+---
