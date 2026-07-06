@@ -1449,7 +1449,13 @@ pub async fn cancel_order(
         Some("cancelled") => return Err((StatusCode::CONFLICT, "This job is already cancelled.".to_string())),
         _ => {}
     }
-    let reason = req.reason.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    // A reason is required so the record always states why the job was cancelled.
+    let reason = req
+        .reason
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or((StatusCode::BAD_REQUEST, "a cancellation reason is required".to_string()))?;
     sqlx::query("UPDATE orders SET status = 'cancelled', cancel_reason = ?, updated_at = ? WHERE id = ?")
         .bind(&reason)
         .bind(now_ms())
