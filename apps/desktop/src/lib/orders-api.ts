@@ -40,6 +40,7 @@ export interface JobTicket {
     total: number;
     started_at: number | null;
     completed_at: number | null;
+    cancel_reason: string | null;
     created_at: number;
     updated_at: number;
     assigned_mechanic_id: string | null;
@@ -132,6 +133,11 @@ export function startOrder(orderId: string): Promise<JobTicket> {
 
 export function markDone(orderId: string): Promise<JobTicket> {
     return api.post<JobTicket>(`/api/orders/${orderId}/done`);
+}
+
+// Cancel an open job (admin/advisor). Non-destructive; throws ApiError(409) if already paid/cancelled.
+export function cancelOrder(orderId: string, reason: string | null): Promise<JobTicket> {
+    return api.post<JobTicket>(`/api/orders/${orderId}/cancel`, { reason });
 }
 
 export function billOrder(orderId: string): Promise<JobTicket> {

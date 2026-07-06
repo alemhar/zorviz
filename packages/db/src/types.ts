@@ -164,6 +164,7 @@ export interface OrdersTable {
     total: number; // centavos
     started_at: Nullable<number>; // when work started (approved → in_progress)
     completed_at: Nullable<number>; // when marked done
+    cancel_reason: Nullable<string>; // set when status = 'cancelled'
     created_at: number;
     updated_at: number;
 }

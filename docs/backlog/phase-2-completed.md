@@ -582,3 +582,35 @@ card shows **"Time on job:"**. Zero console errors.
 - `apps/desktop/src/lib/orders-api.ts` (`startOrder` + timestamps), `apps/desktop/src/pages/job-ticket.tsx`
 
 ---
+
+## ✅ BACK-2-C019 · Cancel job (admin/advisor)
+
+**Completed:** 2026-07-06
+**Origin:** owner — an open (incl. in-progress) job had no way to be cancelled/closed; the `cancelled` status
+existed in the type but was unreachable.
+
+**What was implemented (migration 0013):**
+- **`POST /api/orders/:id/cancel`** `{ reason? }` — **admin/advisor/owner only** (`require_staff`; mechanics
+  403). Sets status `cancelled` + an optional **`cancel_reason`**. **Non-destructive (D24)** — the ticket,
+  items, photos, and history all stay. **Not allowed once paid** (409 "already paid"); re-cancel → 409.
+- **"Cancel" button** on the job ticket header (admin/advisor), shown for any open status (hidden once
+  paid/cancelled) → confirm dialog with an optional reason. A cancelled ticket shows a **"This job was
+  cancelled."** notice with the reason, and the action cards (estimate/checklist/billing) don't render.
+- `orders-api`: `cancelOrder(id, reason)`; `JobTicket.cancel_reason`.
+- **Consistency:** cancelled jobs drop off the active board (already filtered to approved/in_progress), show in
+  the all-Jobs list under the "Cancelled" filter, and don't block asset soft-delete (open-ticket guard already
+  excludes `cancelled`).
+
+**Chosen scope:** cancellable from any open stage (triage → done), **not** paid (voiding a paid sale is a
+refund scenario, out of scope). "Cancel" and "close" folded into one `cancelled` state.
+
+**Verification:** builds clean; migration 0013 applied. curl — admin cancel sets cancelled + reason; re-cancel
+409; **mechanic 403**; cancel a paid order 409. Playwright — mechanic doesn't see Cancel; admin cancels with a
+reason → "This job was cancelled." notice + reason shown + Cancel button gone. Zero console errors.
+
+**Key files:**
+- `packages/db/migrations/sqlite/0013_order_cancel.sql`, `packages/db/src/types.ts`
+- `apps/desktop/src-tauri/src/api_data.rs` (`cancel_order`), `.../server.rs`
+- `apps/desktop/src/lib/orders-api.ts` (`cancelOrder`), `apps/desktop/src/pages/job-ticket.tsx`
+
+---
