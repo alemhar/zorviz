@@ -28,6 +28,11 @@ Davao City. Document title "Job Order"; max manual discount 15%.
 ## What gets seeded
 
 - 1 vehicle asset type; 5 customers (incl. a senior); 5 vehicles.
+- **Inventory: 6 car-aircon parts** (compressor, blower, belt, refrigerant, cabin filter, drier)
+  with stock/reorder/cost/price. The refrigerant starts **below its reorder point** (shows in the
+  Low-stock filter + dashboard stat), the cabin filter has a **Receive +5 adjustment** in its log,
+  and several estimate lines are **inventory-linked** so approved jobs visibly deduct stock
+  (compressor 4→3, blower 5→4; the pending estimate's belt stays undeducted as a contrast).
 - Job orders spanning **every status**: triage, estimate (pending), approved, in-progress
   (assigned, partly done), done, paid, and a **paid Senior-discounted** order (20% + VAT-exempt).
 - 2 bookings (one pending, one confirmed).
