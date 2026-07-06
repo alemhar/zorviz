@@ -101,7 +101,7 @@ export default function JobTicketPage() {
         setCancelling(true);
         setCancelErr("");
         try {
-            setTicket(await cancelOrder(ticket.id, cancelReason.trim() || null));
+            setTicket(await cancelOrder(ticket.id, cancelReason.trim()));
             setCancelOpen(false);
         } catch (e) {
             setCancelErr(e instanceof ApiError && e.message ? e.message : "Could not cancel this job.");
@@ -390,7 +390,7 @@ export default function JobTicketPage() {
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-1">
-                                    <label htmlFor="creason" className="text-sm">Reason (optional)</label>
+                                    <label htmlFor="creason" className="text-sm">Reason for cancelling <span className="text-destructive">*</span></label>
                                     <textarea
                                         id="creason"
                                         className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -402,7 +402,7 @@ export default function JobTicketPage() {
                                 </div>
                                 <DialogFooter>
                                     <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={cancelling}>Keep Job</Button>
-                                    <Button variant="destructive" onClick={cancelJob} disabled={cancelling}>
+                                    <Button variant="destructive" onClick={cancelJob} disabled={cancelling || !cancelReason.trim()}>
                                         {cancelling ? "Cancelling…" : "Cancel Job"}
                                     </Button>
                                 </DialogFooter>

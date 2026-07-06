@@ -135,8 +135,9 @@ export function markDone(orderId: string): Promise<JobTicket> {
     return api.post<JobTicket>(`/api/orders/${orderId}/done`);
 }
 
-// Cancel an open job (admin/advisor). Non-destructive; throws ApiError(409) if already paid/cancelled.
-export function cancelOrder(orderId: string, reason: string | null): Promise<JobTicket> {
+// Cancel an open job (admin/advisor). A reason is required. Non-destructive; throws
+// ApiError(409) if already paid/cancelled, ApiError(400) if the reason is blank.
+export function cancelOrder(orderId: string, reason: string): Promise<JobTicket> {
     return api.post<JobTicket>(`/api/orders/${orderId}/cancel`, { reason });
 }
 

@@ -601,6 +601,11 @@ existed in the type but was unreachable.
   the all-Jobs list under the "Cancelled" filter, and don't block asset soft-delete (open-ticket guard already
   excludes `cancelled`).
 
+**Update 2026-07-06 — reason required.** The cancellation reason is now **mandatory** (was optional) so every
+cancelled job records *why*: the server rejects a blank reason with 400 ("a cancellation reason is required"),
+and the dialog's "Cancel Job" button stays disabled until a reason is typed. Verified via curl (no/blank reason
+→ 400, with reason → 200) + Playwright (button disabled when empty, enabled after typing).
+
 **Chosen scope:** cancellable from any open stage (triage → done), **not** paid (voiding a paid sale is a
 refund scenario, out of scope). "Cancel" and "close" folded into one `cancelled` state.
 
