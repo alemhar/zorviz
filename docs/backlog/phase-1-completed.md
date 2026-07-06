@@ -265,3 +265,37 @@ HTTP API (D23), not Kysely.
 - `apps/desktop/src/pages/{setup,settings,asset-detail}.tsx`
 
 ---
+
+## ✅ BACK-1-C010 · Demo Seeder + Reset Script
+
+**Completed:** 2026-07-06
+**Original Backlog ID:** BACK-1-007
+**Origin:** owner request — start every demo from a fresh, realistic dataset with one command.
+
+**What was implemented (seeds via the HTTP API — chosen approach):**
+- **`scripts/demo/seed.mjs`** (`npm run demo:seed`) — drives the **real endpoints** (so demo data goes through
+  the exact code paths as normal use; no schema duplication). Seeds **NP Car Aircon Repair**: full config
+  (₱, 12% VAT, TIN, proprietor, business style, "Job Order" title, T&C, 15% max discount); users **admin/1234,
+  advisor `ana`/2222, mechanic `boy`/3333**; a single **Vehicle** asset type; 5 customers (incl. a senior) + 5
+  vehicles; **orders spanning every status** — triage, estimate, approved, in-progress (assigned, partly done),
+  done, paid, and a **paid Senior/PWD** order (20% + VAT-exempt, OSCA ID + name); and 2 bookings (pending +
+  confirmed). Guards that the app is fresh (refuses if already set up).
+- **`scripts/demo/reset.mjs`** (`npm run demo:reset`) — one command: stop the app (taskkill + free ports
+  3030/1420), **wipe** the dev data dir (`zorviz.db`+WAL/SHM, `media/`, `license.json`/`trial.json`; backups
+  left intact; clear error if the DB is locked), relaunch `tauri dev` (detached), wait for the server, then
+  seed. Targets `apps/desktop/data`; installed builds use `%LOCALAPPDATA%\Zorviz\data` (documented).
+- Root `package.json` scripts + **`docs/demo-credentials.md`** (logins + what's seeded).
+
+**Verification:** ran `npm run demo:reset` end-to-end — set up, config, users, customers, assets, orders,
+bookings all seeded. API confirmed: dashboard stats populated (active_jobs 1, pending_estimates 1, month
+revenue ₱6,384), all 3 logins work, and the senior order is paid (INV-00002) with **tax ₱0 (VAT-exempt) + ₱560
+senior discount (20% of ₱2,800), total ₱2,240** — math exact.
+
+**⚠️ Not seeded (intentional):** **photos** (no sample images bundled — snap one live during the demo) and the
+**logo** (upload in Settings). Reset relaunch is dev-oriented (`tauri dev`); Windows-focused (taskkill/netstat).
+
+**Key files:**
+- `scripts/demo/seed.mjs` (new), `scripts/demo/reset.mjs` (new)
+- `package.json` (demo:seed / demo:reset), `docs/demo-credentials.md` (new)
+
+---

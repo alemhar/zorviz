@@ -10,7 +10,9 @@
         "build": "turbo build",
         "dev": "turbo dev",
         "lint": "turbo lint",
-        "format": "prettier --write \"**/*.{ts,tsx,md}\""
+        "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+        "demo:seed": "node scripts/demo/seed.mjs",
+        "demo:reset": "node scripts/demo/reset.mjs"
     },
     "devDependencies": {
         "eslint": "^9.0.0",
