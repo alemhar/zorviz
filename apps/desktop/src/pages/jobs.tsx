@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@zorviz/ui";
 import { ArrowLeft } from "lucide-react";
-import { listJobs, type JobSummary } from "../lib/orders-api";
+import { formatMoney } from "@zorviz/core";
+import { listJobs, listAllJobs, type JobSummary } from "../lib/orders-api";
+import type { OrderStatus } from "@zorviz/db";
 import { StatusBadge } from "../components/status-badge";
+import { useAuthStore } from "../stores/auth";
+import { useAppConfigStore } from "../stores/app-config";
 
 function jobLabel(job: JobSummary): string {
     const s = (job.asset?.specs ?? {}) as Record<string, string>;
@@ -19,17 +23,29 @@ function elapsed(ms: number): string {
     return `${Math.floor(h / 24)}d ago`;
 }
 
+const STATUS_ORDER: OrderStatus[] = ["triage", "estimate", "approved", "in_progress", "done", "paid", "cancelled"];
+
 export default function JobsPage() {
     const navigate = useNavigate();
+    const role = useAuthStore((s) => s.user?.role);
+    const currency = useAppConfigStore((s) => s.config?.currency_symbol ?? "");
+    // Mechanics see their own active queue ("My Jobs"); staff see every job ("Jobs").
+    const mine = role === "mechanic";
+
     const [jobs, setJobs] = useState<JobSummary[]>([]);
     const [loaded, setLoaded] = useState(false);
+    const [filter, setFilter] = useState<OrderStatus | "all">("all");
 
     useEffect(() => {
-        listJobs(true)
+        (mine ? listJobs(true) : listAllJobs())
             .then(setJobs)
             .catch(() => {})
             .finally(() => setLoaded(true));
-    }, []);
+    }, [mine]);
+
+    // Status filter chips (staff view) — only statuses that are actually present.
+    const presentStatuses = useMemo(() => STATUS_ORDER.filter((st) => jobs.some((j) => j.status === st)), [jobs]);
+    const shown = filter === "all" ? jobs : jobs.filter((j) => j.status === filter);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -37,14 +53,33 @@ export default function JobsPage() {
                 <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h1 className="text-lg font-bold">My Jobs</h1>
+                <h1 className="text-lg font-bold">{mine ? "My Jobs" : "Jobs"}</h1>
             </header>
 
             <main className="p-4 max-w-md mx-auto space-y-3">
-                {loaded && jobs.length === 0 && (
-                    <p className="text-muted-foreground text-center py-10">No jobs assigned to you.</p>
+                {!mine && jobs.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {(["all", ...presentStatuses] as const).map((st) => (
+                            <button
+                                key={st}
+                                onClick={() => setFilter(st)}
+                                className={`text-xs px-2.5 py-1 rounded-full border capitalize transition-colors ${
+                                    filter === st ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
+                                }`}
+                            >
+                                {st === "all" ? "All" : st.replace("_", " ")}
+                            </button>
+                        ))}
+                    </div>
                 )}
-                {jobs.map((job) => (
+
+                {loaded && shown.length === 0 && (
+                    <p className="text-muted-foreground text-center py-10">
+                        {mine ? "No jobs assigned to you." : "No jobs yet."}
+                    </p>
+                )}
+
+                {shown.map((job) => (
                     <Card
                         key={job.id}
                         className="cursor-pointer active:scale-95 transition-transform"
@@ -52,13 +87,22 @@ export default function JobsPage() {
                     >
                         <CardContent className="p-4 space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                                <span className="font-semibold">{jobLabel(job)}</span>
+                                <span className="font-semibold truncate">{jobLabel(job)}</span>
                                 <StatusBadge status={job.status} />
                             </div>
+                            {!mine && (job.customer || job.total > 0) && (
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground truncate">{job.customer?.name ?? "Walk-in"}</span>
+                                    {job.total > 0 && <span>{formatMoney(job.total, currency)}</span>}
+                                </div>
+                            )}
                             <div className="text-sm text-muted-foreground line-clamp-2">
                                 {job.customer_complaint || "No complaint recorded"}
                             </div>
-                            <div className="text-xs text-muted-foreground">{elapsed(job.created_at)}</div>
+                            <div className="text-xs text-muted-foreground">
+                                {mine ? elapsed(job.created_at) : new Date(job.created_at).toLocaleDateString()}
+                                {job.receipt_number ? ` · ${job.receipt_number}` : ""}
+                            </div>
                         </CardContent>
                     </Card>
                 ))}

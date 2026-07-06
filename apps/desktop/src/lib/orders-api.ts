@@ -54,7 +54,10 @@ export interface JobSummary {
     customer_complaint: string | null;
     created_at: number;
     assigned_mechanic_id: string | null;
+    total: number; // centavos
+    receipt_number: string | null;
     asset?: { type: string; specs: Record<string, unknown> };
+    customer?: { id: string; name: string; phone: string | null } | null;
 }
 
 export interface EstimateItemInput {
@@ -104,6 +107,11 @@ export function approveOrder(
 
 export function listJobs(assignedToMe = false): Promise<JobSummary[]> {
     return api.get<JobSummary[]>(`/api/orders${assignedToMe ? "?assigned=me" : ""}`);
+}
+
+// All jobs, every status (management view for admin/advisor).
+export function listAllJobs(): Promise<JobSummary[]> {
+    return api.get<JobSummary[]>("/api/orders?scope=all");
 }
 
 export function assignOrder(orderId: string, mechanicId: string | null): Promise<JobTicket> {

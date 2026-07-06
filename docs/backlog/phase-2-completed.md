@@ -522,3 +522,32 @@ via the discounts endpoint and rehydrates in the editor UI (Playwright), zero co
 - `apps/desktop/src/pages/settings.tsx`, `apps/desktop/src/features/repair/components/{EstimateBuilder,DiscountsDialog}.tsx`
 
 ---
+
+## ✅ BACK-2-C017 · Role-based Jobs views (My Jobs vs Jobs)
+
+**Completed:** 2026-07-06
+**Origin:** owner noticed "My Jobs" showed for admins — it's a mechanic's personal queue; admin/advisor need an all-jobs overview.
+
+**What was implemented:**
+- **Dashboard tiles are now role-appropriate:** **"My Jobs"** shows **only for mechanics** (their assigned
+  queue); **"Jobs"** shows for **owner/admin/advisor** (all jobs, every status). (Previously "My Jobs" showed
+  for everyone.)
+- **`/jobs` page adapts by role:** mechanic → their active assigned jobs (as before); staff → **all jobs across
+  every status** with **status filter chips** (only statuses present are offered), each card showing asset,
+  customer, total, date, receipt #, tap-through to the ticket.
+- **Backend:** `GET /api/orders?scope=all` returns every order (all statuses); `list_orders` now also embeds the
+  **customer** (name/phone) on each row. Existing `assigned=me` (mechanic queue) and default active-board
+  behavior unchanged.
+- `orders-api`: `JobSummary` gained `total`/`receipt_number`/`customer`; added `listAllJobs()`.
+
+**Verification:** builds clean; Rust recompiled. curl — `scope=all` returns 7 orders spanning all statuses with
+customer + total embedded. Playwright — admin dashboard shows **Jobs** (not My Jobs) and the Jobs page lists all
+statuses with working filter chips (paid filter hides triage); mechanic dashboard shows **My Jobs** (not Jobs)
+and the page is titled "My Jobs". Zero console errors.
+
+**Key files:**
+- `apps/desktop/src-tauri/src/api_data.rs` (`list_orders` scope=all + customer embed)
+- `apps/desktop/src/lib/orders-api.ts` (`listAllJobs`, richer `JobSummary`)
+- `apps/desktop/src/pages/jobs.tsx` (role-adaptive), `apps/desktop/src/pages/dashboard.tsx` (tiles)
+
+---
