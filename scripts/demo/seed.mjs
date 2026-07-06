@@ -121,6 +121,29 @@ export async function seedDemo() {
         ramil: await asset(cust.ramil, { plateNumber: "JKL-7788", make: "Ford", model: "Ranger", year: "2017", color: "Blue" }),
     };
 
+    // 5b) Inventory — a small car-aircon parts catalog. Some estimate lines below link to
+    // these, so approvals visibly deduct stock; the refrigerant starts below its reorder
+    // point so the Low-stock filter and the dashboard low-stock stat have something to show.
+    log("inventory (parts catalog)");
+    const mkPart = (name, sku, stock, reorder, cost, price, description) =>
+        api("POST", "/api/inventory", {
+            name, sku, description,
+            stock_on_hand: stock,
+            reorder_point: reorder,
+            unit_cost: peso(cost),
+            unit_price: peso(price),
+        });
+    const inv = {
+        compressor: await mkPart("A/C Compressor (reman)", "COMP-R134", 4, 2, 4800, 6500, "remanufactured, universal mount"),
+        blower: await mkPart("Blower Motor", "BLOW-12V", 5, 2, 1900, 2800, "12V single-speed"),
+        belt: await mkPart("Compressor Belt A33", "BELT-A33", 12, 4, 120, 260),
+        refrigerant: await mkPart("R134a Refrigerant 500g", "R134-500", 2, 6, 180, 350, "500g can"),
+        filter: await mkPart("Cabin Air Filter", "CABF-STD", 15, 5, 90, 210, "fits most sedans"),
+        drier: await mkPart("Receiver Drier", "DRIER-U", 8, 3, 350, 620),
+    };
+    // One manual adjustment so the stock log has history (Receive +5 from a delivery).
+    await api("POST", `/api/inventory/${inv.filter.id}/adjust`, { type: "receive", delta: 5, note: "Initial supplier delivery" });
+
     // helpers for the order pipeline
     const inspection = [
         { item: "Exterior / Body", status: "ok", note: "" },
@@ -137,7 +160,9 @@ export async function seedDemo() {
         for (const it of order.items ?? []) await api("PUT", `/api/order_items/${it.id}/complete`, { completed: true });
     };
     const svc = (description, unit_price, quantity = 1, unit = "job") => ({ type: "service", description, quantity, unit, unit_price: peso(unit_price) });
-    const part = (description, unit_price, quantity = 1, unit = "pc") => ({ type: "part", description, quantity, unit, unit_price: peso(unit_price) });
+    // Pass an inventory item to link the line (stock then deducts when the job is approved).
+    const part = (description, unit_price, quantity = 1, unit = "pc", invItem = null) =>
+        ({ type: "part", description, quantity, unit, unit_price: peso(unit_price), inventory_item_id: invItem?.id ?? null });
 
     // 6) Orders spanning every status so all views/stats are populated.
     log("orders across all statuses");
@@ -147,7 +172,8 @@ export async function seedDemo() {
 
     // estimate (pending)
     const oEst = await mkOrder(a.maria.id, "Aircon compressor noisy", "3302", "COD");
-    await estimate(oEst.id, [svc("Freon recharge & leak test", 1200), part("Compressor belt", 450)]);
+    // Belt is inventory-linked but the estimate is NOT approved → no stock deduction (contrast case).
+    await estimate(oEst.id, [svc("Freon recharge & leak test", 1200), part("Compressor Belt A33", 260, 1, "pc", inv.belt)]);
 
     // approved
     const oApp = await mkOrder(a.ramil.id, "No cooling; suspect low refrigerant", "3303", "COD");
@@ -157,14 +183,14 @@ export async function seedDemo() {
 
     // in_progress (assigned, 1 of 2 items done)
     const oIp = await mkOrder(a.pedro.id, "Aircon compressor replacement", "3304", "50% down");
-    const oIpE = await estimate(oIp.id, [part("A/C Compressor (reman)", 6500, 1, "set"), svc("Labor — R&R compressor", 2500)]);
+    const oIpE = await estimate(oIp.id, [part("A/C Compressor (reman)", 6500, 1, "set", inv.compressor), svc("Labor — R&R compressor", 2500)]);
     await api("POST", `/api/orders/${oIp.id}/approve`, { approved_by: cust.pedro.name, method: "Phone" });
     if (mechId) await api("POST", `/api/orders/${oIp.id}/assign`, { mechanic_id: mechId });
     if (oIpE.items?.[0]) await api("PUT", `/api/order_items/${oIpE.items[0].id}/complete`, { completed: true });
 
     // done (all items complete, not yet billed)
     const oDone = await mkOrder(a.juan.id, "Cabin filter + evaporator cleaning", "3305", "COD");
-    const oDoneE = await estimate(oDone.id, [svc("Evaporator cleaning", 1800), part("Cabin air filter", 550)]);
+    const oDoneE = await estimate(oDone.id, [svc("Evaporator cleaning", 1800), part("Cabin Air Filter", 210, 1, "pc", inv.filter)]);
     await api("POST", `/api/orders/${oDone.id}/approve`, { approved_by: cust.juan.name, method: "In person" });
     if (mechId) await api("POST", `/api/orders/${oDone.id}/assign`, { mechanic_id: mechId });
     await completeAll(oDoneE);
@@ -172,7 +198,7 @@ export async function seedDemo() {
 
     // paid (billed)
     const oPaid = await mkOrder(a.maria.id, "Blower motor replacement", "3306", "COD");
-    const oPaidE = await estimate(oPaid.id, [part("Blower motor", 2800, 1, "pc"), svc("Labor", 900)]);
+    const oPaidE = await estimate(oPaid.id, [part("Blower Motor", 2800, 1, "pc", inv.blower), svc("Labor", 900)]);
     await api("POST", `/api/orders/${oPaid.id}/approve`, { approved_by: cust.maria.name, method: "In person" });
     await completeAll(oPaidE);
     await api("POST", `/api/orders/${oPaid.id}/done`);
