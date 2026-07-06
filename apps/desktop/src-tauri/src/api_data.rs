@@ -1424,6 +1424,42 @@ pub async fn mark_done(
     order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
 }
 
+#[derive(Deserialize)]
+pub struct CancelReq {
+    reason: Option<String>,
+}
+
+/// POST /api/orders/:id/cancel — cancel an open job (admin/advisor). Non-destructive: sets
+/// status 'cancelled' + optional reason; keeps all data (D24). Not allowed once paid.
+pub async fn cancel_order(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(req): Json<CancelReq>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    require_staff(&state, &headers).map_err(|s| (s, "staff only".to_string()))?;
+    let status: Option<String> = sqlx::query_scalar("SELECT status FROM orders WHERE id = ? LIMIT 1")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
+    match status.as_deref() {
+        None => return Err((StatusCode::NOT_FOUND, "order not found".to_string())),
+        Some("paid") => return Err((StatusCode::CONFLICT, "This job is already paid — it can't be cancelled.".to_string())),
+        Some("cancelled") => return Err((StatusCode::CONFLICT, "This job is already cancelled.".to_string())),
+        _ => {}
+    }
+    let reason = req.reason.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    sqlx::query("UPDATE orders SET status = 'cancelled', cancel_reason = ?, updated_at = ? WHERE id = ?")
+        .bind(&reason)
+        .bind(now_ms())
+        .bind(&id)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "cancel failed".to_string()))?;
+    order_detail(&state, &id).await.ok_or((StatusCode::NOT_FOUND, "not found".to_string())).map(Json)
+}
+
 /// POST /api/orders/:id/start — a mechanic starts work: approved → in_progress, stamps
 /// `started_at` (once), and claims the job (assigns to the current user) if it's unassigned
 /// and the actor is a mechanic. Auth required. Idempotent while in_progress.

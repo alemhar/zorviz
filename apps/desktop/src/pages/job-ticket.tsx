@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button, Card, CardHeader, CardTitle, CardContent } from "@zorviz/ui";
-import { ArrowLeft, CheckCircle2, AlertTriangle, MinusCircle, FileText, UserCog } from "lucide-react";
+import {
+    Button, Card, CardHeader, CardTitle, CardContent,
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@zorviz/ui";
+import { ArrowLeft, CheckCircle2, AlertTriangle, MinusCircle, FileText, UserCog, Ban } from "lucide-react";
 import { formatMoney } from "@zorviz/core";
-import { getOrder, completeItem, startOrder, markDone, billOrder, type JobTicket, type InspectionItem } from "../lib/orders-api";
+import { getOrder, completeItem, startOrder, markDone, billOrder, cancelOrder, type JobTicket, type InspectionItem } from "../lib/orders-api";
+import { ApiError } from "../lib/api";
 import { generateInvoicePdf } from "../lib/invoice-pdf";
 import { StatusBadge } from "../components/status-badge";
 import { EstimateBuilder } from "../features/repair/components/EstimateBuilder";
@@ -56,6 +60,10 @@ export default function JobTicketPage() {
     const [approvalOpen, setApprovalOpen] = useState(false);
     const [assignOpen, setAssignOpen] = useState(false);
     const [discountsOpen, setDiscountsOpen] = useState(false);
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelReason, setCancelReason] = useState("");
+    const [cancelling, setCancelling] = useState(false);
+    const [cancelErr, setCancelErr] = useState("");
 
     const toggleItem = async (itemId: string, completed: boolean) => {
         try {
@@ -88,6 +96,19 @@ export default function JobTicketPage() {
             console.error(e);
         }
     };
+    const cancelJob = async () => {
+        if (!ticket) return;
+        setCancelling(true);
+        setCancelErr("");
+        try {
+            setTicket(await cancelOrder(ticket.id, cancelReason.trim() || null));
+            setCancelOpen(false);
+        } catch (e) {
+            setCancelErr(e instanceof ApiError && e.message ? e.message : "Could not cancel this job.");
+        } finally {
+            setCancelling(false);
+        }
+    };
 
     useEffect(() => {
         if (!id) return;
@@ -104,11 +125,30 @@ export default function JobTicketPage() {
                 </button>
                 <h1 className="text-lg font-bold">Job Ticket</h1>
                 {ticket && <StatusBadge status={ticket.status} />}
+                {ticket && isStaff && ticket.status !== "paid" && ticket.status !== "cancelled" && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto"
+                        onClick={() => { setCancelReason(""); setCancelErr(""); setCancelOpen(true); }}
+                    >
+                        <Ban className="w-4 h-4 mr-1 text-destructive" /> Cancel
+                    </Button>
+                )}
             </header>
 
             <main className="p-4 max-w-md mx-auto space-y-4">
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 {!ticket && !error && <p className="text-muted-foreground">Loading…</p>}
+
+                {ticket && ticket.status === "cancelled" && (
+                    <Card className="border-destructive/40">
+                        <CardContent className="p-4 text-sm">
+                            <span className="font-medium text-destructive">This job was cancelled.</span>
+                            {ticket.cancel_reason && <div className="text-muted-foreground mt-1">Reason: {ticket.cancel_reason}</div>}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {ticket && (
                     <>
@@ -340,6 +380,34 @@ export default function JobTicketPage() {
                             onOpenChange={setDiscountsOpen}
                             onSaved={setTicket}
                         />
+
+                        <Dialog open={cancelOpen} onOpenChange={(o) => { if (!cancelling) setCancelOpen(o); }}>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Cancel this job?</DialogTitle>
+                                    <DialogDescription>
+                                        The ticket stays on record (marked Cancelled) — nothing is deleted. It leaves the active job board.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-1">
+                                    <label htmlFor="creason" className="text-sm">Reason (optional)</label>
+                                    <textarea
+                                        id="creason"
+                                        className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        placeholder="e.g. Customer declined the estimate"
+                                        value={cancelReason}
+                                        onChange={(e) => setCancelReason(e.target.value)}
+                                    />
+                                    {cancelErr && <p className="text-sm text-destructive">{cancelErr}</p>}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={cancelling}>Keep Job</Button>
+                                    <Button variant="destructive" onClick={cancelJob} disabled={cancelling}>
+                                        {cancelling ? "Cancelling…" : "Cancel Job"}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                         <ApprovalDialog
                             ticket={ticket}
                             open={approvalOpen}

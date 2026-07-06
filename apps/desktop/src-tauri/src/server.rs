@@ -156,6 +156,7 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
         .route("/api/orders/:id/approve", post(api_data::approve_order))
         .route("/api/orders/:id/assign", post(api_data::assign_order))
         .route("/api/orders/:id/start", post(api_data::start_order))
+        .route("/api/orders/:id/cancel", post(api_data::cancel_order))
         .route("/api/orders/:id/done", post(api_data::mark_done))
         .route("/api/orders/:id/bill", post(api_data::bill_order))
         .route(
