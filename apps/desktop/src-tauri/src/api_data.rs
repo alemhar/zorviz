@@ -1312,6 +1312,8 @@ pub async fn list_orders(
 ) -> Result<Json<Vec<Value>>, StatusCode> {
     let session = session_from_headers(&state, &headers).ok_or(StatusCode::UNAUTHORIZED)?;
 
+    // `assigned=me` → a mechanic's active queue; `scope=all` → every job, all statuses
+    // (management "Jobs" view for admin/advisor); default → active board (approved/in_progress).
     let rows = if params.get("assigned").map(|s| s.as_str()) == Some("me") {
         sqlx::query(
             "SELECT * FROM orders WHERE status IN ('approved','in_progress') AND assigned_mechanic_id = ? ORDER BY created_at DESC",
@@ -1319,6 +1321,10 @@ pub async fn list_orders(
         .bind(&session.user_id)
         .fetch_all(&state.pool)
         .await
+    } else if params.get("scope").map(|s| s.as_str()) == Some("all") {
+        sqlx::query("SELECT * FROM orders ORDER BY created_at DESC")
+            .fetch_all(&state.pool)
+            .await
     } else {
         sqlx::query("SELECT * FROM orders WHERE status IN ('approved','in_progress') ORDER BY created_at DESC")
             .fetch_all(&state.pool)
@@ -1338,6 +1344,15 @@ pub async fn list_orders(
                 let mut a = row_to_json(&arow);
                 parse_json_field(&mut a, "specs");
                 obj.insert("asset".to_string(), Value::Object(a));
+            }
+        }
+        if let Some(cid) = obj.get("customer_id").and_then(|v| v.as_str()).map(String::from) {
+            if let Ok(Some(crow)) = sqlx::query("SELECT id, name, phone FROM customers WHERE id = ? LIMIT 1")
+                .bind(&cid)
+                .fetch_optional(&state.pool)
+                .await
+            {
+                obj.insert("customer".to_string(), Value::Object(row_to_json(&crow)));
             }
         }
         out.push(Value::Object(obj));

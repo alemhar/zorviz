@@ -42,13 +42,24 @@ export default function DashboardPage() {
             href: "/repair",
             color: "from-blue-500 to-blue-600",
         },
-        {
-            title: "My Jobs",
-            description: "Jobs assigned to you",
-            icon: ClipboardList,
-            href: "/jobs",
-            color: "from-amber-500 to-amber-600",
-        },
+        ...(user?.role === "mechanic"
+            ? [{
+                title: "My Jobs",
+                description: "Jobs assigned to you",
+                icon: ClipboardList,
+                href: "/jobs",
+                color: "from-amber-500 to-amber-600",
+            }]
+            : []),
+        ...(user?.role === "admin" || user?.role === "owner" || user?.role === "advisor"
+            ? [{
+                title: "Jobs",
+                description: "All jobs & statuses",
+                icon: ClipboardList,
+                href: "/jobs",
+                color: "from-amber-500 to-amber-600",
+            }]
+            : []),
         ...(user?.role === "admin" || user?.role === "owner" || user?.role === "advisor"
             ? [{
                 title: "Bookings",
