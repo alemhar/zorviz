@@ -5,6 +5,7 @@ import { useAppConfigStore } from "../stores/app-config";
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@zorviz/ui";
 import { Wrench } from "lucide-react";
 import { logoUrl } from "../lib/logo-api";
+import { PinInput } from "../components/pin-input";
 
 export default function LoginPage() {
     const navigate = useNavigate();
@@ -17,18 +18,26 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const doLogin = async (pinValue: string) => {
+        if (!username.trim() || pinValue.length !== 4 || isLoading) return;
         setIsLoading(true);
         setError("");
         try {
-            await login(username, pin);
+            await login(username, pinValue);
             navigate("/");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Login failed.");
+            // Clear the boxes for a clean retry and put the cursor back on the first one.
+            setPin("");
+            document.getElementById("pin-0")?.focus();
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        void doLogin(pin);
     };
 
     return (
@@ -49,7 +58,7 @@ export default function LoginPage() {
                         Sign in with your username and PIN
                     </CardDescription>
                 </CardHeader>
-                <form onSubmit={handleLogin}>
+                <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="username">Username</Label>
@@ -62,21 +71,18 @@ export default function LoginPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="pin">PIN</Label>
-                            <Input
-                                id="pin"
-                                type="password"
-                                inputMode="numeric"
-                                placeholder="••••"
+                            <Label className="block text-center">PIN</Label>
+                            <PinInput
                                 value={pin}
-                                onChange={(e) => setPin(e.target.value)}
-                                required
+                                onChange={setPin}
+                                onComplete={(v) => void doLogin(v)}
                             />
+                            <p className="text-center text-xs text-muted-foreground">PIN is 4 digits.</p>
                         </div>
-                        {error && <p className="text-sm text-destructive">{error}</p>}
+                        {error && <p className="text-sm text-destructive text-center">{error}</p>}
                     </CardContent>
                     <CardFooter>
-                        <Button className="w-full" type="submit" disabled={isLoading}>
+                        <Button className="w-full" type="submit" disabled={isLoading || pin.length !== 4}>
                             {isLoading ? "Signing in..." : "Sign In"}
                         </Button>
                     </CardFooter>
