@@ -1,6 +1,6 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Eight open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip). Everything else complete — core loop,
+> **Status:** Nine open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only). Everything else complete — core loop,
 > asset detail/edit/soft-delete, lightweight bookings, photos + note threads, role-based Jobs views,
 > Start Job + timing, cancel, discounts. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
@@ -245,6 +245,37 @@ compact) so **at least the first 2–3 action tiles are visible immediately** wi
 - [ ] Mobile: at least the first 2–3 action tiles visible without scrolling on first load
 - [ ] Desktop layout unchanged
 - [ ] Strip degrades cleanly when fewer stats are shown (BACK-2-015 mechanic view)
+
+---
+
+## BACK-2-020 · Billing Actions (Mark as Paid, Invoice PDF) — Staff Only
+
+**Priority:** 🟡 Medium (role correctness; includes a server-side gating gap)
+**Area:** `apps/desktop/src/pages/job-ticket.tsx` (Billing card), `bill_order` in `api_data.rs`
+**Origin:** Owner found while testing as a mechanic, 2026-07-07 — Mark as Paid and Invoice PDF show
+for mechanics; should be advisor/admin/owner only.
+
+**Confirmed current state:**
+- **Invoice PDF** button: no role gate (mechanics see it).
+- **Mark as Paid**: gated only by `status === "done"` — mechanics see and can press it.
+- (Discounts is already correctly `isStaff`-gated.)
+- **Server:** `POST /api/orders/:id/bill` is only session-gated — a mechanic could mark an order
+  paid via the API directly. Same class of gap as the backup endpoints (BACK-2-015).
+
+**Proposed handling:**
+- **UI:** gate the Invoice PDF and Mark as Paid buttons with the existing `isStaff`
+  (owner/admin/advisor). Billing/collecting money is front-desk work; the mechanic's job ends at
+  **Mark as Done**.
+- **Server (authoritative):** `bill_order` → `require_staff` (mechanic → 403).
+- **Decide at build:** whether mechanics should see the **Billing card at all** on a done/paid
+  ticket (totals/receipt are revenue-adjacent info) — hiding the whole card for mechanics is
+  consistent with BACK-2-015's revenue-hiding; alternatively keep the card visible with no actions.
+
+**Acceptance Criteria:**
+- [ ] Mechanic on a done/paid ticket sees no Mark as Paid and no Invoice PDF (card visibility per
+      the build-time decision)
+- [ ] Advisor/admin/owner unchanged
+- [ ] Server rejects a mechanic `POST /:id/bill` with 403 (can't be bypassed)
 
 ---
 
