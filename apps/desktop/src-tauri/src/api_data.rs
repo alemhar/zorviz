@@ -1115,9 +1115,7 @@ pub async fn get_stats(State(state): State<ApiState>, headers: HeaderMap) -> Res
 // ---- Backup & restore ----
 
 pub async fn backup_now(State(state): State<ApiState>, headers: HeaderMap) -> Result<Json<Value>, StatusCode> {
-    if session_from_headers(&state, &headers).is_none() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    require_staff(&state, &headers)?; // BACK-2-015: staff only (mechanic → 403)
     let name = crate::backup::backup_now(&state.pool, &crate::db::data_dir())
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -1126,9 +1124,7 @@ pub async fn backup_now(State(state): State<ApiState>, headers: HeaderMap) -> Re
 
 /// POST /api/backup-full — on-demand full backup (DB + media, single zip). Auth required.
 pub async fn backup_full(State(state): State<ApiState>, headers: HeaderMap) -> Result<Json<Value>, StatusCode> {
-    if session_from_headers(&state, &headers).is_none() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    require_staff(&state, &headers)?; // BACK-2-015: staff only (mechanic → 403)
     let name = crate::backup::full_backup_now(&state.pool, &crate::db::data_dir())
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -1136,9 +1132,7 @@ pub async fn backup_full(State(state): State<ApiState>, headers: HeaderMap) -> R
 }
 
 pub async fn list_backups(State(state): State<ApiState>, headers: HeaderMap) -> Result<Json<Value>, StatusCode> {
-    if session_from_headers(&state, &headers).is_none() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    require_staff(&state, &headers)?; // BACK-2-015: staff only (mechanic → 403)
     let dir = crate::db::data_dir();
     let backups = crate::backup::list_backups(&state.pool, &dir).await;
     let dir_path = crate::backup::resolve_backup_dir(&state.pool, &dir).await;
@@ -1155,9 +1149,7 @@ pub async fn restore_backup(
     headers: HeaderMap,
     Json(req): Json<RestoreReq>,
 ) -> Result<Json<Value>, StatusCode> {
-    if session_from_headers(&state, &headers).is_none() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    require_admin(&state, &headers)?; // BACK-2-015: restore is destructive — admin/owner only
     crate::backup::stage_restore(&state.pool, &crate::db::data_dir(), &req.filename)
         .await
         .map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -1174,9 +1166,7 @@ pub async fn set_backup_dir(
     headers: HeaderMap,
     Json(req): Json<BackupDirReq>,
 ) -> Result<Json<Value>, StatusCode> {
-    if session_from_headers(&state, &headers).is_none() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    require_admin(&state, &headers)?; // BACK-2-015: changing the backup folder — admin/owner only
     let value = if req.dir.trim().is_empty() { None } else { Some(req.dir.trim().to_string()) };
     sqlx::query("UPDATE app_config SET backup_dir = ?, updated_at = ? WHERE id = 'default'")
         .bind(&value)

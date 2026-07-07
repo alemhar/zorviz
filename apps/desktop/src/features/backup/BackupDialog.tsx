@@ -11,6 +11,7 @@ import {
 } from "@zorviz/ui";
 import { Save, RotateCcw, FolderCog, Images } from "lucide-react";
 import { listBackups, backupNow, fullBackup, restoreBackup, setBackupDir, type BackupInfo } from "../../lib/backup-api";
+import { useAuthStore } from "../../stores/auth";
 
 interface Props {
     open: boolean;
@@ -18,6 +19,10 @@ interface Props {
 }
 
 export function BackupDialog({ open, onOpenChange }: Props) {
+    // Restore + changing the backup folder are destructive/admin ops (server-gated to
+    // admin/owner). Advisors can create + view backups only. (BACK-2-015)
+    const role = useAuthStore((s) => s.user?.role);
+    const isAdmin = role === "owner" || role === "admin";
     const [dir, setDir] = useState("");
     const [backups, setBackups] = useState<BackupInfo[]>([]);
     const [busy, setBusy] = useState(false);
@@ -110,10 +115,12 @@ export function BackupDialog({ open, onOpenChange }: Props) {
                     <div className="space-y-1">
                         <Label htmlFor="backupdir">Backup folder</Label>
                         <div className="flex gap-2">
-                            <Input id="backupdir" value={dir} onChange={(e) => setDir(e.target.value)} />
-                            <Button variant="outline" onClick={saveDir} disabled={busy}>
-                                <FolderCog className="w-4 h-4 mr-1" /> Save
-                            </Button>
+                            <Input id="backupdir" value={dir} onChange={(e) => setDir(e.target.value)} disabled={!isAdmin} />
+                            {isAdmin && (
+                                <Button variant="outline" onClick={saveDir} disabled={busy}>
+                                    <FolderCog className="w-4 h-4 mr-1" /> Save
+                                </Button>
+                            )}
                         </div>
                     </div>
 
@@ -147,9 +154,11 @@ export function BackupDialog({ open, onOpenChange }: Props) {
                                             {(b.size / 1024).toFixed(0)} KB · {new Date(b.modified).toLocaleString()}
                                         </div>
                                     </div>
-                                    <Button variant="outline" size="sm" disabled={busy} onClick={() => doRestore(b.name)}>
-                                        <RotateCcw className="w-4 h-4 mr-1" /> Restore
-                                    </Button>
+                                    {isAdmin && (
+                                        <Button variant="outline" size="sm" disabled={busy} onClick={() => doRestore(b.name)}>
+                                            <RotateCcw className="w-4 h-4 mr-1" /> Restore
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>

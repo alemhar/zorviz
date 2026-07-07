@@ -25,6 +25,10 @@ export default function DashboardPage() {
     const roleLabel = useRoleLabel();
     const [backupOpen, setBackupOpen] = useState(false);
     const [stats, setStats] = useState<DashboardStats | null>(null);
+    // Role gates (BACK-2-015): mechanics don't see financial revenue, the front-desk
+    // Repair Shop entry point, or backup/restore (that's admin/advisor work).
+    const isMechanic = user?.role === "mechanic";
+    const isStaff = user?.role === "owner" || user?.role === "admin" || user?.role === "advisor";
 
     useEffect(() => {
         fetchConfig();
@@ -37,13 +41,15 @@ export default function DashboardPage() {
     };
 
     const modules = [
-        {
-            title: "Repair Shop",
-            description: "Manage assets, jobs, and estimates",
-            icon: Wrench,
-            href: "/repair",
-            color: "from-blue-500 to-blue-600",
-        },
+        ...(isStaff
+            ? [{
+                title: "Repair Shop",
+                description: "Manage assets, jobs, and estimates",
+                icon: Wrench,
+                href: "/repair",
+                color: "from-blue-500 to-blue-600",
+            }]
+            : []),
         ...(user?.role === "mechanic"
             ? [{
                 title: "My Jobs",
@@ -120,7 +126,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className={`grid grid-cols-1 gap-4 ${isMechanic ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
                     <div className="p-5 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
@@ -154,17 +160,19 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-5 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                                <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">This Month</p>
-                                <p className="text-2xl font-bold">{formatMoney(stats?.month_revenue ?? 0, config?.currency_symbol ?? "")}</p>
+                    {!isMechanic && (
+                        <div className="p-5 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                                    <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">This Month</p>
+                                    <p className="text-2xl font-bold">{formatMoney(stats?.month_revenue ?? 0, config?.currency_symbol ?? "")}</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Module Navigation */}
@@ -196,13 +204,15 @@ export default function DashboardPage() {
                         <h3 className="font-semibold mb-4">Appearance</h3>
                         <ThemeSwitcher />
                     </div>
-                    <div className="border rounded-xl p-6 bg-card">
-                        <h3 className="font-semibold mb-2">Data</h3>
-                        <p className="text-sm text-muted-foreground mb-4">Back up your shop's data or restore from a backup.</p>
-                        <Button variant="outline" onClick={() => setBackupOpen(true)}>
-                            <DatabaseBackup className="w-4 h-4 mr-2" /> Backup &amp; Restore
-                        </Button>
-                    </div>
+                    {isStaff && (
+                        <div className="border rounded-xl p-6 bg-card">
+                            <h3 className="font-semibold mb-2">Data</h3>
+                            <p className="text-sm text-muted-foreground mb-4">Back up your shop's data or restore from a backup.</p>
+                            <Button variant="outline" onClick={() => setBackupOpen(true)}>
+                                <DatabaseBackup className="w-4 h-4 mr-2" /> Backup &amp; Restore
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </main>
 

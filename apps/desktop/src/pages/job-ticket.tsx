@@ -4,7 +4,7 @@ import {
     Button, Card, CardHeader, CardTitle, CardContent,
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@zorviz/ui";
-import { ArrowLeft, CheckCircle2, AlertTriangle, MinusCircle, FileText, UserCog, Ban, Printer } from "lucide-react";
+import { ArrowLeft, CheckCircle2, AlertTriangle, MinusCircle, FileText, UserCog, Ban, Printer, ChevronRight } from "lucide-react";
 import { formatMoney } from "@zorviz/core";
 import { getOrder, completeItem, startOrder, markDone, billOrder, cancelOrder, type JobTicket, type InspectionItem } from "../lib/orders-api";
 import { ApiError } from "../lib/api";
@@ -171,7 +171,15 @@ export default function JobTicketPage() {
                     <>
                         <Card>
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-base">{assetTitle(ticket.asset)}</CardTitle>
+                                <button
+                                    onClick={() => navigate(`/repair/asset/${ticket.asset_id}`)}
+                                    className="flex items-center gap-1 text-left group"
+                                >
+                                    <CardTitle className="text-base group-hover:text-primary group-hover:underline">
+                                        {assetTitle(ticket.asset)}
+                                    </CardTitle>
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                                </button>
                             </CardHeader>
                             <CardContent className="text-sm text-muted-foreground space-y-1">
                                 <div className="capitalize">{ticket.asset?.type}</div>

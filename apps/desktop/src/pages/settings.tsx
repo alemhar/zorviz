@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent } from "@zorviz/ui";
-import { ArrowLeft, Store, Coins, Monitor, ListPlus, Plus, Trash2, Image as ImageIcon, FileText } from "lucide-react";
+import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent, ThemeSwitcher } from "@zorviz/ui";
+import { ArrowLeft, Store, Coins, Monitor, ListPlus, Plus, Trash2, Image as ImageIcon, FileText, Palette } from "lucide-react";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
 import { AssetTypesSettings } from "../features/repair/components/AssetTypesSettings";
@@ -15,6 +15,8 @@ export default function SettingsPage() {
     const navigate = useNavigate();
     const currentUser = useAuthStore((s) => s.user);
     const isAdmin = currentUser?.role === "admin" || currentUser?.role === "owner";
+    // BACK-2-015: mechanics see only personal sections (Appearance); no shop/financial config.
+    const isMechanic = currentUser?.role === "mechanic";
 
     const config = useAppConfigStore((s) => s.config);
     const fetchConfig = useAppConfigStore((s) => s.fetchConfig);
@@ -240,12 +242,23 @@ export default function SettingsPage() {
             </header>
 
             <main className="p-4 max-w-lg mx-auto space-y-4">
-                {ro && (
+                {ro && !isMechanic && (
                     <p className="text-sm text-muted-foreground">
                         Only an admin can change settings. These values are read-only for your role.
                     </p>
                 )}
 
+                <Card>
+                    <CardHeader className="flex-row items-center gap-2 space-y-0">
+                        <Palette className="w-5 h-5 text-primary" />
+                        <CardTitle className="text-base">Appearance</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ThemeSwitcher />
+                    </CardContent>
+                </Card>
+
+                {!isMechanic && (<>
                 <Card>
                     <CardHeader className="flex-row items-center gap-2 space-y-0">
                         <ImageIcon className="w-5 h-5 text-primary" />
@@ -469,6 +482,7 @@ export default function SettingsPage() {
                         )}
                     </CardContent>
                 </Card>
+                </>)}
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 {saved && <p className="text-sm text-emerald-600">Settings saved.</p>}
