@@ -1,6 +1,6 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Six open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation). Everything else complete — core loop,
+> **Status:** Seven open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings). Everything else complete — core loop,
 > asset detail/edit/soft-delete, lightweight bookings, photos + note threads, role-based Jobs views,
 > Start Job + timing, cancel, discounts. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
@@ -185,6 +185,35 @@ The same wrongness hits every other entry path: staff **Jobs list → ticket →
 - [ ] Repair search → ticket → back returns to **Repair Shop** (current behavior preserved for that path)
 - [ ] Asset detail → history → ticket → back returns to the **asset detail**
 - [ ] Deep-linked ticket (no history) falls back sensibly by role (mechanic → My Jobs)
+
+---
+
+## BACK-2-018 · Move the Appearance (Theme) Card from Dashboard into Settings
+
+**Priority:** 🟢 Low (dashboard declutter)
+**Area:** `apps/desktop/src/pages/dashboard.tsx` (Appearance card, ~line 193), `apps/desktop/src/pages/settings.tsx`
+**Origin:** Owner request 2026-07-07.
+
+**Description:**
+Remove the **Appearance** card (ThemeSwitcher) from the dashboard and house it in the **Settings**
+page instead (e.g. its own small "Appearance" card near the top). Declutters the dashboard, which
+has grown tiles.
+
+**Interplay to resolve at build time (flagged):**
+- **BACK-2-015 hides the Settings tile from mechanics** — but the theme is a **per-device/per-user
+  preference**, not shop config, and mechanics need it too (e.g. dark mode in the shop bay).
+  Options: (a) the Appearance section in Settings is visible + usable by **all roles** and
+  mechanics keep a Settings entry that shows *only* Appearance; (b) mechanics get a lightweight
+  theme toggle elsewhere (e.g. dashboard header icon); (c) accept mechanics keep whatever theme
+  was set. Decide together with BACK-2-015.
+- Settings' admin-only read-only gating (`ro`) must NOT disable the theme switcher — theme is
+  local preference, not `app_config`.
+
+**Acceptance Criteria:**
+- [ ] Appearance card gone from the dashboard
+- [ ] Theme switcher available in Settings, usable regardless of the page's admin read-only gating
+- [ ] Every role (incl. mechanics) still has a way to change theme (per the BACK-2-015 decision)
+- [ ] Theme choice persists as it does today
 
 ---
 
