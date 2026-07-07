@@ -1,6 +1,6 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Eleven open items — BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only), BACK-2-021 (case-insensitive usernames), BACK-2-022 (slide-to-confirm on actions), BACK-2-023 (assign staff-only), BACK-2-024 (responsive estimate dialog), BACK-2-025 (dyslexia-friendly mode). Everything else complete — core loop,
+> **Status:** Fourteen open items — BACK-2-015 (mechanic dashboard cleanup + backup API gating — *implemented, pending verification*), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only), BACK-2-021 (case-insensitive usernames), BACK-2-022 (slide-to-confirm on actions), BACK-2-023 (assign staff-only), BACK-2-024 (responsive estimate dialog), BACK-2-025 (dyslexia-friendly mode), BACK-2-026 (de-emphasize trial banner), BACK-2-027 (QR-code login + printable QR), BACK-2-028 (mechanic checklist completion UX + confirmation). Everything else complete — core loop,
 > asset detail/edit/soft-delete, lightweight bookings, photos + note threads, role-based Jobs views,
 > Start Job + timing, cancel, discounts. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
@@ -397,5 +397,110 @@ to a dyslexia-friendly presentation:
 - [ ] Works fully offline (font bundled, no network fetch)
 - [ ] Layout survives the metric change (spot-check dense views: estimate dialog, tables, PIN boxes)
 - [ ] Off by default; toggling back restores the standard look exactly
+
+---
+
+## BACK-2-026 · De-emphasize & Relocate the Trial Banner
+
+**Priority:** 🟢 Low (visual polish; the trial notice is currently too loud)
+**Area:** `apps/desktop/src/components/license-area.tsx`, `apps/desktop/src/App.tsx` (banner placement)
+**Origin:** Owner request 2026-07-07.
+
+**Description:**
+The **"Trial — N day(s) left"** notice currently renders as a full-width, high-contrast bar
+(solid `bg-blue-600` white text) pinned at the very top of every screen (in `LicenseArea`, above
+the router). It dominates the UI. Move it somewhere **less obtrusive** and soften it: a **lighter
+font/among a muted tint** instead of the loud solid bar.
+
+**Scope / considerations:**
+- This is specifically the **trial** state (blue). The **grace** (amber) and **read-only**
+  (destructive/red) states are genuine warnings — keep those prominent; only the trial notice gets
+  toned down. Decide at build whether to key off `status.state === "trial"` for the softer treatment.
+- Candidate relocations (decide at build): a small pill in the dashboard header next to the shop
+  name / `ServerStatus`; a subtle footer line; or a muted chip near the user menu. Keep the
+  **"Enter License"** affordance reachable (can move into the license dialog / a smaller link).
+- Lighter styling: muted foreground (e.g. `text-muted-foreground`) on a transparent/subtle
+  background rather than solid blue.
+
+**Acceptance Criteria:**
+- [ ] Trial notice no longer occupies the full-width top bar; it lives in a less prominent location
+- [ ] Font/color is lightened (muted) vs today's solid high-contrast bar
+- [ ] Grace / read-only license states remain prominent (unchanged)
+- [ ] A path to "Enter License" is still reachable
+
+---
+
+## BACK-2-027 · QR-Code Login on Desktop (scan to connect) + Printable QR in Settings
+
+**Priority:** 🟡 Medium (removes daily friction — the LAN IP changes, mechanics retype it)
+**Area:** `apps/desktop/src/pages/login.tsx` (show QR), `apps/desktop/src/pages/settings.tsx`
+(printable QR), server URL source (`get_server_url` / `GET /api/...`), bundled offline QR lib
+**Origin:** Owner request 2026-07-07.
+
+**Description:**
+The desktop app is the Commander node serving on `http://<LAN-IP>:3030`; the IP **changes over
+time** (DHCP), so mechanics ("Scout nodes") have to rediscover/retype it to connect from their
+phones. Add a **scannable QR code** encoding the current server URL so a mechanic can **scan and go**.
+
+**Scope:**
+- **Login page:** render a QR of the live server URL (from the existing `get_server_url` command /
+  server-status source) so a phone camera opens the right address. Include the plain URL as text too.
+- **Settings:** add a **printable** QR (a print/download action, consistent with D9 PDF-style
+  export) so the shop can tape it to the wall / hand it out.
+- **Offline:** QR generation must be fully local (bundle a JS QR library — e.g. `qrcode` — no
+  network/CDN), per the strict local-first rule.
+
+**Considerations (decide at build):**
+- What the QR encodes: the bare `http://<ip>:3030` (opens the scout web app) — confirm the scout
+  entry URL/route. If a token/pairing is ever needed it's out of scope here (v1 is LAN-trusted).
+- IP volatility: the QR must reflect the **current** IP at render time (re-generate on load), not a
+  cached value. Consider a manual "refresh" affordance.
+- Print path: reuse the PDF/download approach (or `window.print` of a QR-only view) — decide at build.
+
+**Acceptance Criteria:**
+- [ ] Desktop login page shows a QR encoding the current server URL + the URL as readable text
+- [ ] Scanning it on a phone opens the correct LAN address
+- [ ] Settings offers a printable/downloadable QR
+- [ ] QR is generated fully offline (library bundled, no network fetch)
+- [ ] QR reflects the current IP (regenerated on load, not stale)
+
+---
+
+## BACK-2-028 · Enhance Mechanic Checklist Completion UX (bigger target + confirmation)
+
+**Priority:** 🟡 Medium (mobile ergonomics for the mechanic's core action)
+**Area:** `apps/desktop/src/pages/job-ticket.tsx` (in_progress "Work Checklist" section)
+**Origin:** Owner request 2026-07-07.
+
+**Description:**
+When a mechanic works a job, each task is ticked off via a **small (`h-5 w-5`) checkbox** in the
+Work Checklist. On a phone this is a **tiny touch target** and easy to mis-tap. Improve the UX:
+**enlarge the checkbox** or replace it with a **better, easier-to-hit element** (e.g. a full-width
+tappable row / large toggle / "Done" pill per task), and **add a confirmation** before a task flips
+state.
+
+**Cross-reference — confirmation interplay with [BACK-2-022](#) (Slide-to-Confirm):**
+BACK-2-022 currently *leans toward excluding* per-task checklist ticks from slide-to-confirm
+("frequent micro-actions — a slide per tick would be painful; mis-ticks are easily reversible").
+This item now explicitly asks for a confirmation on completion, so the two must be reconciled at
+build. Options to decide:
+- Confirm only the **final "Mark as Done"** button (the irreversible step) via BACK-2-022's
+  SlideToConfirm, and make per-task ticks a big, easy, *un*-confirmed toggle (reversible).
+- Or a lightweight per-tick confirmation (e.g. tap-again / brief undo) rather than a full slide.
+Pick one and note it in BACK-2-022 so the two stay consistent.
+
+**Considerations (decide at build):**
+- Element choice: enlarged checkbox vs full-row tap-target vs large toggle/segmented "Done".
+  Whatever is chosen must keep the "all tasks complete → enables Mark as Done" logic intact.
+- Touch target ≥ 44px; clear done/undone visual state (the current line-through can stay).
+- Keep it fast — a mechanic ticks many items; don't make each tick tedious (ties into the
+  confirmation decision above).
+
+**Acceptance Criteria:**
+- [ ] Checklist completion uses a larger, easy-to-hit target on mobile (≥ ~44px), not the tiny box
+- [ ] Some confirmation exists for marking work done (final step at minimum), reconciled with
+      BACK-2-022 (and BACK-2-022 updated to match the decision)
+- [ ] "Mark as Done" still only enables when every task is complete
+- [ ] Clear visual done/undone state; no regression to the timing/completion flow
 
 ---
