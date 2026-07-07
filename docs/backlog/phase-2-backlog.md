@@ -1,6 +1,6 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Three open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate). Everything else complete — core loop,
+> **Status:** Four open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating). Everything else complete — core loop,
 > asset detail/edit/soft-delete, lightweight bookings, photos + note threads, role-based Jobs views,
 > Start Job + timing, cancel, discounts. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
@@ -76,6 +76,42 @@ Billing card (status `done`/`paid`). Nothing exposes it at the estimate stage.
       (already in the layout — regression-check)
 - [ ] After printing/signing, Mark Approved works unchanged (record who + how)
 - [ ] Optional: "Signed job order" approval method; optional stage annotation on the printout
+
+---
+
+## BACK-2-015 · Mechanic Dashboard — Hide Financial/Admin Elements (+ gate backup API)
+
+**Priority:** 🟡 Medium (role hygiene; contains one real server-side gating gap)
+**Area:** `apps/desktop/src/pages/dashboard.tsx`, `apps/desktop/src-tauri/src/api_data.rs` (backup handlers)
+**Origin:** Owner request 2026-07-07 — hide from mechanics: the revenue tile, Repair Shop tile,
+Settings tile, and Backup card.
+
+**Assessment (agreed, per element):**
+- **Month Revenue stat** — hide from mechanics. Financially sensitive; none of a mechanic's business.
+  (Consider at build time whether "Pending Estimates" and "Low Stock" stay — both are harmless and
+  Low Stock is arguably useful to a mechanic; "Active Jobs" definitely stays.)
+- **Repair Shop tile** — hide. Asset search/create + intake is front-desk work; mechanics live in
+  **My Jobs**. *Nuance:* a mechanic may legitimately want a vehicle's **service history** while
+  working — consider (now or later) a link from the job ticket to the asset-detail page so that
+  remains reachable without the Repair Shop entry point.
+- **Settings tile** — hide. The page is already read-only for mechanics; zero value shown.
+- **Backup ("Data") card** — hide, **and** fix the real gap found while logging this:
+  `POST /api/backup`, `GET /api/backups`, `POST /api/restore`, `POST /api/backup-dir` are only
+  **session-gated** — any logged-in mechanic could stage a database **restore** via the API.
+  Gate server-side (restore/backup-dir at least `require_staff`, arguably admin-only; keep them
+  exempt from the read-only license gate per D24). Hiding the card alone would be security theater.
+
+**Resulting mechanic dashboard:** greeting/role, Active Jobs (± Low Stock), **My Jobs** tile,
+theme switcher. Clean and focused on their work.
+
+**Acceptance Criteria:**
+- [ ] Mechanic dashboard shows no Month Revenue stat, no Repair Shop / Settings tiles, no Data
+      (backup) card
+- [ ] Admin/advisor dashboards unchanged
+- [ ] Backup/restore endpoints role-gated server-side (mechanic → 403), still exempt from the
+      read-only license gate (D24)
+- [ ] Decide + implement: mechanic path to asset service history from the job ticket (or explicitly
+      defer it)
 
 ---
 
