@@ -1,6 +1,6 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Nine open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only). Everything else complete — core loop,
+> **Status:** Ten open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only), BACK-2-021 (case-insensitive usernames). Everything else complete — core loop,
 > asset detail/edit/soft-delete, lightweight bookings, photos + note threads, role-based Jobs views,
 > Start Job + timing, cancel, discounts. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
@@ -276,6 +276,48 @@ for mechanics; should be advisor/admin/owner only.
       the build-time decision)
 - [ ] Advisor/admin/owner unchanged
 - [ ] Server rejects a mechanic `POST /:id/bill` with 403 (can't be bypassed)
+
+---
+
+## BACK-2-021 · Usernames — Case-Insensitive Login + Store Lowercase
+
+**Priority:** 🟡 Medium (real login failures on phones — mobile keyboards auto-capitalize)
+**Area:** `auth.rs` (login lookup + lockout map), `api_data.rs` (setup + create_user),
+username inputs in `login.tsx` / `setup.tsx` / `users.tsx`, one data migration
+**Origin:** Owner found on mobile 2026-07-07 — the phone capitalizes the first letter ("Boy"), and
+login fails because the match is exact.
+
+**Confirmed current state:**
+- Login lookup is **case-sensitive** (`WHERE username = ?` in `auth.rs`).
+- Usernames are stored **as typed** (only trimmed) at setup and staff creation.
+- The duplicate-username check is also case-sensitive — so "Boy" and "boy" could coexist today.
+- No username input sets `autoCapitalize="none"` — phones capitalize by default.
+
+**Owner decisions:**
+- Login matches **case-insensitively**.
+- Usernames are **always saved lowercase**.
+
+**Proposed handling:**
+- **Normalize at the source:** setup + create_user lowercase the username before storing; the
+  duplicate check compares `COLLATE NOCASE`.
+- **Login:** lowercase the submitted username before lookup (with lowercase storage, exact match
+  then suffices; belt-and-braces `COLLATE NOCASE` acceptable). Also normalize the **lockout map
+  key** in `auth.rs` so "Boy"/"boy" share the same fail counter (otherwise the lockout is
+  case-bypassable).
+- **Data migration:** lowercase existing `users.username` values (collision guard: if two rows
+  would collide, keep both untouched and log — realistically none exist yet).
+- **Input UX (the immediate mobile fix):** add `autoCapitalize="none" autoCorrect="off"
+  spellCheck={false}` to the username fields on login, setup, and staff creation so phones stop
+  capitalizing in the first place.
+- Demo seeder usernames are already lowercase (admin/ana/boy) — no change needed.
+
+**Acceptance Criteria:**
+- [ ] Typing "Boy" (or "BOY") on the login screen logs in the user stored as "boy"
+- [ ] New usernames from the wizard/staff dialog are persisted lowercase regardless of input
+- [ ] Duplicate check is case-insensitive ("Ana" rejected when "ana" exists)
+- [ ] Failed-attempt lockout counts "Boy" and "boy" as the same account
+- [ ] Existing usernames migrated to lowercase
+- [ ] Username inputs no longer auto-capitalize on phones
 
 ---
 
