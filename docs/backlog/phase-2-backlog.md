@@ -94,7 +94,13 @@ Settings tile, and Backup card.
   **My Jobs**. *Nuance:* a mechanic may legitimately want a vehicle's **service history** while
   working — consider (now or later) a link from the job ticket to the asset-detail page so that
   remains reachable without the Repair Shop entry point.
-- **Settings tile** — hide. The page is already read-only for mechanics; zero value shown.
+- **Settings tile** — ~~hide~~ **REVISED by owner 2026-07-07: keep for ALL roles.** Every user can
+  open Settings, but the page shows **role-filtered sections**: mechanics do NOT see shop/financial
+  config (tax configuration, max discount, shop details/proprietor/VAT, printed document, asset
+  types, data import, logo) — they see only the personal sections (Appearance/theme, and the
+  dyslexia toggle once BACK-2-025 lands). Admin/owner see everything (editable); advisor keeps
+  today's read-only view of shop config (or trim similarly — decide at build). This also resolves
+  the interplay flagged in BACK-2-018/025 (theme + accessibility must reach mechanics).
 - **Backup ("Data") card** — hide, **and** fix the real gap found while logging this:
   `POST /api/backup`, `GET /api/backups`, `POST /api/restore`, `POST /api/backup-dir` are only
   **session-gated** — any logged-in mechanic could stage a database **restore** via the API.
@@ -102,11 +108,13 @@ Settings tile, and Backup card.
   exempt from the read-only license gate per D24). Hiding the card alone would be security theater.
 
 **Resulting mechanic dashboard:** greeting/role, Active Jobs (± Low Stock), **My Jobs** tile,
-theme switcher. Clean and focused on their work.
+**Settings** tile (opens the trimmed, personal-sections-only view), theme switcher (until
+BACK-2-018 moves it into Settings). Clean and focused on their work.
 
 **Acceptance Criteria:**
-- [ ] Mechanic dashboard shows no Month Revenue stat, no Repair Shop / Settings tiles, no Data
-      (backup) card
+- [ ] Mechanic dashboard shows no Month Revenue stat, no Repair Shop tile, no Data (backup) card
+- [ ] Settings tile visible to **all roles**; for mechanics the page shows only personal sections
+      (no tax config, no discounts/max discount, no shop identity/document/asset-types/import/logo)
 - [ ] Admin/advisor dashboards unchanged
 - [ ] Backup/restore endpoints role-gated server-side (mechanic → 403), still exempt from the
       read-only license gate (D24)
@@ -200,12 +208,10 @@ page instead (e.g. its own small "Appearance" card near the top). Declutters the
 has grown tiles.
 
 **Interplay to resolve at build time (flagged):**
-- **BACK-2-015 hides the Settings tile from mechanics** — but the theme is a **per-device/per-user
-  preference**, not shop config, and mechanics need it too (e.g. dark mode in the shop bay).
-  Options: (a) the Appearance section in Settings is visible + usable by **all roles** and
-  mechanics keep a Settings entry that shows *only* Appearance; (b) mechanics get a lightweight
-  theme toggle elsewhere (e.g. dashboard header icon); (c) accept mechanics keep whatever theme
-  was set. Decide together with BACK-2-015.
+- **Resolved by the owner's 2026-07-07 revision of BACK-2-015:** Settings stays visible to ALL
+  roles with role-filtered sections — mechanics see the personal sections (Appearance incl. this
+  theme switcher, plus BACK-2-025's dyslexia toggle) and none of the shop/financial config. So
+  option (a): Appearance is visible + usable by every role.
 - Settings' admin-only read-only gating (`ro`) must NOT disable the theme switcher — theme is
   local preference, not `app_config`.
 
@@ -451,10 +457,10 @@ to a dyslexia-friendly presentation:
 - **Per-device vs per-user:** theme is per-device today; a shared front-desk PC means one person's
   toggle affects others. Per-device (simple, consistent with theme) vs per-user preference storage —
   decide at build; per-device is the pragmatic default.
-- **Placement + roles:** lives in the **Appearance** section (moving to Settings per BACK-2-018) and
-  must be usable by **all roles** including mechanics (it's a personal accessibility preference, not
-  shop config — must not be caught by the Settings admin read-only gating). Same interplay as the
-  theme switcher.
+- **Placement + roles:** lives in the **Appearance** section (moving to Settings per BACK-2-018).
+  Per the owner's revised BACK-2-015, Settings is visible to all roles with role-filtered sections —
+  Appearance (incl. this toggle) is one of the sections mechanics DO see, and it must not be caught
+  by the admin read-only gating.
 - Out of scope: the PDF printout keeps its current font (customer-facing document, unaffected).
 
 **Acceptance Criteria:**
