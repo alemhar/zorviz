@@ -1,6 +1,6 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Ten open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only), BACK-2-021 (case-insensitive usernames). Everything else complete — core loop,
+> **Status:** Eleven open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only), BACK-2-021 (case-insensitive usernames), BACK-2-022 (slide-to-confirm on actions). Everything else complete — core loop,
 > asset detail/edit/soft-delete, lightweight bookings, photos + note threads, role-based Jobs views,
 > Start Job + timing, cancel, discounts. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
@@ -318,6 +318,52 @@ login fails because the match is exact.
 - [ ] Failed-attempt lockout counts "Boy" and "boy" as the same account
 - [ ] Existing usernames migrated to lowercase
 - [ ] Username inputs no longer auto-capitalize on phones
+
+---
+
+## BACK-2-022 · Slide-to-Confirm on Action Buttons (anti pocket-press)
+
+**Priority:** 🟡 Medium (mobile safety — one accidental tap can change a job's state)
+**Area:** new shared component (e.g. `components/slide-confirm.tsx`), applied across action buttons
+**Origin:** Owner request 2026-07-07.
+
+**Description:**
+State-changing **action buttons** should ask for confirmation before executing — with a **Cancel**
+option — and the confirmation itself should be a **slide/swipe gesture** (like slide-to-unlock), so
+a phone in a pocket or a stray touch can't falsely trigger it. **Navigation buttons/links are
+explicitly excluded** (owner decision) — only mutations.
+
+**Proposed shape:**
+- A reusable **SlideToConfirm** control: tap the action button → a small sheet/dialog appears with
+  the action named (e.g. *"Slide to mark as done →"*), a draggable handle that must travel the full
+  track to fire, and a **Cancel** button / tap-outside to dismiss. Pointer-based drag (works with
+  mouse on desktop too).
+- **One-tap mutating actions get it first** (highest pocket-press risk):
+  Start Job · Mark as Done · Mark as Paid · booking **Confirm**/**Cancel** · photo **Delete** ·
+  inventory delete (replaces the current `window.confirm`) · backup **Restore**.
+- **Actions already behind dialogs** (Mark Approved → ApprovalDialog, Cancel Job → reason dialog,
+  Save Estimate, Discounts, Adjust Stock): decide at build whether their final button also becomes
+  a slide, or whether the dialog itself is deemed sufficient friction — sliding *everything* may
+  make desktop use tedious.
+
+**Design considerations (decide at build time):**
+- **Desktop ergonomics:** drag works with a mouse but feels slow — consider slide-on-touch devices
+  / plain confirm-button on desktop (pointer-type detection), or keep slide everywhere for
+  consistency.
+- **Checklist item ticks:** frequent micro-actions — a slide per tick would be painful; likely
+  exclude (mis-ticks are easily reversible), but confirm with owner.
+- Tiering: destructive/irreversible (restore, deletes, paid) vs routine (start/done) — could use
+  slide for the first tier only if full coverage feels heavy in practice. Owner's stated intent:
+  all action buttons.
+- Accessibility: provide a keyboard/AT fallback (e.g. hold-Enter or a double-confirm) since a drag
+  gesture alone isn't accessible.
+
+**Acceptance Criteria:**
+- [ ] Reusable slide-to-confirm component (names the action, full-travel to fire, Cancel/dismiss)
+- [ ] Applied to the agreed set of mutating actions; navigation untouched
+- [ ] A straight tap on an action button never mutates state directly anymore (for covered actions)
+- [ ] Works by touch on phones and by mouse on desktop; accessible fallback exists
+- [ ] Verified on a real phone: a casual tap opens the sheet, dismissing is easy, sliding fires
 
 ---
 
