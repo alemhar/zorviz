@@ -12,7 +12,8 @@
         "lint": "turbo lint",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
         "demo:seed": "node scripts/demo/seed.mjs",
-        "demo:reset": "node scripts/demo/reset.mjs"
+        "demo:reset": "node scripts/demo/reset.mjs",
+        "demo:start": "node scripts/demo/start.mjs"
     },
     "devDependencies": {
         "eslint": "^9.0.0",

@@ -26,6 +26,8 @@ compiles longer).
 - [ ] Log in as `admin / 123456` — the dashboard shows non-zero stats (active jobs, pending
       estimates, month revenue, **low stock: 1**).
 
+> **Don't want to reset?** `npm run demo:start` launches the app with the **existing data**
+> (no wipe, no seed; detached; no-op if already running).
 > Seeding only (app already running and *unconfigured*): `npm run demo:seed`.
 > Installed build instead of dev: wipe `%LOCALAPPDATA%\Zorviz\data`, launch the installed app,
 > then `npm run demo:seed`.

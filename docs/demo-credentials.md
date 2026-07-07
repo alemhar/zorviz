@@ -6,6 +6,8 @@ The demo dataset (BACK-1-007) is loaded by the seeder scripts.
 
 - **`npm run demo:reset`** — stop the app, wipe the dev data, relaunch the dev app, and seed a
   fresh demo. Use this before each demo.
+- **`npm run demo:start`** — just launch the app with the **existing data** (no wipe, no seed).
+  Detached like reset, so the terminal returns. Safe to run when already up (no-op).
 - **`npm run demo:seed`** — seed only (assumes the app is already running and **not yet set up**).
 
 > Dev workflow: the scripts target `apps/desktop/data`. For an installed build, data lives in
