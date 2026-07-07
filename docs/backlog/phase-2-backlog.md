@@ -1,6 +1,6 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Eleven open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only), BACK-2-021 (case-insensitive usernames), BACK-2-022 (slide-to-confirm on actions). Everything else complete — core loop,
+> **Status:** Twelve open items — BACK-2-012 (Jobs date filter), BACK-2-013 (photo-note keyboard UX), BACK-2-014 (print job order at estimate), BACK-2-015 (mechanic dashboard cleanup + backup API gating), BACK-2-016 (Start Job mechanic-only), BACK-2-017 (ticket back-navigation), BACK-2-018 (Appearance -> Settings), BACK-2-019 (mobile one-row KPI strip), BACK-2-020 (billing actions staff-only), BACK-2-021 (case-insensitive usernames), BACK-2-022 (slide-to-confirm on actions), BACK-2-023 (assign staff-only). Everything else complete — core loop,
 > asset detail/edit/soft-delete, lightweight bookings, photos + note threads, role-based Jobs views,
 > Start Job + timing, cancel, discounts. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
@@ -364,6 +364,35 @@ explicitly excluded** (owner decision) — only mutations.
 - [ ] A straight tap on an action button never mutates state directly anymore (for covered actions)
 - [ ] Works by touch on phones and by mouse on desktop; accessible fallback exists
 - [ ] Verified on a real phone: a casual tap opens the sheet, dismissing is easy, sliding fires
+
+---
+
+## BACK-2-023 · Assign / Re-assign — Staff Only (admin/advisor)
+
+**Priority:** 🟡 Medium (role correctness; completes the role-hardening set with 015/016/020)
+**Area:** `apps/desktop/src/pages/job-ticket.tsx` (Assign button), `assign_order` in `api_data.rs`
+**Origin:** Owner request 2026-07-07 — mechanics should not have the Assign feature; only
+admin/advisor (and owner) can assign and re-assign jobs to mechanics.
+
+**Confirmed current state:**
+- The **Assign** button on the ticket is gated only by status (hidden on paid/cancelled) — **no
+  role gate**; mechanics see it and can open the dialog.
+- **Server:** `POST /api/orders/:id/assign` is only session-gated — a mechanic could assign or
+  re-assign (or unassign!) any job via the API.
+
+**Proposed handling:**
+- **UI:** render the Assign button only for `isStaff` (owner/admin/advisor). Mechanics still see
+  the assignee name (read-only).
+- **Server (authoritative):** `assign_order` → `require_staff` (mechanic → 403).
+- **Preserve the one intentional exception:** `start_order`'s **auto-claim** (a mechanic starting
+  an unassigned job gets assigned to it) stays — that's self-assignment via Start (BACK-2-016 flow),
+  not the Assign feature. The restriction here is on explicit assign/re-assign/unassign.
+
+**Acceptance Criteria:**
+- [ ] Mechanic sees the assignee on a ticket but no Assign button
+- [ ] Admin/advisor/owner assign + re-assign unchanged
+- [ ] Server rejects mechanic `POST /:id/assign` with 403
+- [ ] Mechanic Start Job still auto-claims an unassigned job (regression-check with BACK-2-016)
 
 ---
 
