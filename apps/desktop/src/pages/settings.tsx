@@ -4,6 +4,7 @@ import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent, ThemeSw
 import { ArrowLeft, Store, Coins, Monitor, ListPlus, Plus, Trash2, Image as ImageIcon, FileText, Palette } from "lucide-react";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
+import { useDyslexiaStore } from "../stores/dyslexia";
 import { AssetTypesSettings } from "../features/repair/components/AssetTypesSettings";
 import { logoUrl, uploadLogo, deleteLogo } from "../lib/logo-api";
 import { importCustomers } from "../lib/customers-api";
@@ -17,6 +18,8 @@ export default function SettingsPage() {
     const isAdmin = currentUser?.role === "admin" || currentUser?.role === "owner";
     // BACK-2-015: mechanics see only personal sections (Appearance); no shop/financial config.
     const isMechanic = currentUser?.role === "mechanic";
+    const dyslexic = useDyslexiaStore((s) => s.enabled);
+    const setDyslexic = useDyslexiaStore((s) => s.setEnabled);
 
     const config = useAppConfigStore((s) => s.config);
     const fetchConfig = useAppConfigStore((s) => s.fetchConfig);
@@ -253,8 +256,26 @@ export default function SettingsPage() {
                         <Palette className="w-5 h-5 text-primary" />
                         <CardTitle className="text-base">Appearance</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
                         <ThemeSwitcher />
+                        <div className="flex items-center justify-between gap-3 border-t pt-4">
+                            <div className="min-w-0">
+                                <div className="text-sm font-medium">Dyslexia-friendly text</div>
+                                <div className="text-xs text-muted-foreground">
+                                    OpenDyslexic font with extra letter &amp; line spacing. Applies to this device.
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={dyslexic}
+                                aria-label="Dyslexia-friendly text"
+                                onClick={() => setDyslexic(!dyslexic)}
+                                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${dyslexic ? "bg-primary" : "bg-muted"}`}
+                            >
+                                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${dyslexic ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+                            </button>
+                        </div>
                     </CardContent>
                 </Card>
 

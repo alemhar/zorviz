@@ -19,6 +19,8 @@ import SettingsPage from "./pages/settings";
 import BookingsPage from "./pages/bookings";
 import InventoryPage from "./pages/inventory";
 import "@zorviz/ui/src/styles.css";
+import "./dyslexia.css";
+import "./stores/dyslexia"; // applies the persisted .dyslexic class at startup
 
 function App() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
