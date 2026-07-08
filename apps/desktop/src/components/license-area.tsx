@@ -25,11 +25,13 @@ export function LicenseArea() {
     if (!status || status.state === "valid") return null;
 
     const readonly = status.access === "readonly";
+    // BACK-2-026: the trial notice is informational, not a warning — show it as a small, muted
+    // corner pill instead of a loud full-width bar. Grace/read-only are real warnings and keep
+    // the prominent top bar.
+    const subtle = !readonly && status.state !== "grace";
     const bannerCls = readonly
         ? "bg-destructive text-destructive-foreground"
-        : status.state === "grace"
-          ? "bg-amber-500 text-white"
-          : "bg-blue-600 text-white";
+        : "bg-amber-500 text-white";
 
     const install = async () => {
         setBusy(true);
@@ -57,16 +59,26 @@ export function LicenseArea() {
 
     return (
         <>
-            <div className={`px-4 py-2 text-sm flex items-center justify-between gap-3 ${bannerCls}`}>
-                <span className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    {status.message ?? "License notice"}
-                    {readonly && " — the app is read-only; your data is safe."}
-                </span>
-                <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setOpen(true)}>
-                    <KeyRound className="w-4 h-4 mr-1" /> Enter License
-                </Button>
-            </div>
+            {subtle ? (
+                <button
+                    onClick={() => setOpen(true)}
+                    className="fixed bottom-3 left-3 z-40 flex items-center gap-1.5 rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
+                >
+                    <span>{status.message ?? "Trial"}</span>
+                    <span className="text-primary underline underline-offset-2">Enter license</span>
+                </button>
+            ) : (
+                <div className={`px-4 py-2 text-sm flex items-center justify-between gap-3 ${bannerCls}`}>
+                    <span className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        {status.message ?? "License notice"}
+                        {readonly && " — the app is read-only; your data is safe."}
+                    </span>
+                    <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setOpen(true)}>
+                        <KeyRound className="w-4 h-4 mr-1" /> Enter License
+                    </Button>
+                </div>
+            )}
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent>
