@@ -170,6 +170,14 @@ export async function generateInvoicePdf(
     totalRow(taxLabel, formatMoney(ticket.tax, currency));
     totalRow("Total", formatMoney(ticket.total, currency), true);
 
+    // BACK-3-007: payment method + change returned (when a payment was recorded).
+    if (ticket.payment) {
+        const methodLabel =
+            ticket.payment.method === "gcash" ? "GCash" : ticket.payment.method === "card" ? "Card" : "Cash";
+        totalRow(`Paid via ${methodLabel}`, formatMoney(ticket.payment.tendered, currency));
+        if (ticket.payment.change_due > 0) totalRow("Change", formatMoney(ticket.payment.change_due, currency));
+    }
+
     // Terms & Conditions block (only if configured).
     if (config?.terms_and_conditions) {
         y += 4;

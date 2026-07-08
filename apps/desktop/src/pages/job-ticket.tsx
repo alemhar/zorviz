@@ -6,7 +6,7 @@ import {
 } from "@zorviz/ui";
 import { ArrowLeft, CheckCircle2, AlertTriangle, MinusCircle, FileText, UserCog, Ban, Printer, ChevronRight, Check } from "lucide-react";
 import { formatMoney } from "@zorviz/core";
-import { getOrder, completeItem, startOrder, markDone, billOrder, cancelOrder, type JobTicket, type InspectionItem } from "../lib/orders-api";
+import { getOrder, completeItem, startOrder, markDone, cancelOrder, type JobTicket, type InspectionItem } from "../lib/orders-api";
 import { ApiError } from "../lib/api";
 import { generateInvoicePdf } from "../lib/invoice-pdf";
 import { StatusBadge } from "../components/status-badge";
@@ -15,6 +15,7 @@ import { ApprovalDialog } from "../features/repair/components/ApprovalDialog";
 import { AssignDialog } from "../features/repair/components/AssignDialog";
 import { TicketPhotos } from "../features/repair/components/TicketPhotos";
 import { DiscountsDialog } from "../features/repair/components/DiscountsDialog";
+import { PaymentDialog } from "../features/repair/components/PaymentDialog";
 import { useAppConfigStore } from "../stores/app-config";
 import { useAuthStore } from "../stores/auth";
 import { toast } from "../stores/toast";
@@ -65,6 +66,7 @@ export default function JobTicketPage() {
     const [approvalOpen, setApprovalOpen] = useState(false);
     const [assignOpen, setAssignOpen] = useState(false);
     const [discountsOpen, setDiscountsOpen] = useState(false);
+    const [paymentOpen, setPaymentOpen] = useState(false);
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState("");
     const [cancelling, setCancelling] = useState(false);
@@ -95,15 +97,7 @@ export default function JobTicketPage() {
             console.error(e);
         }
     };
-    const markPaid = async () => {
-        if (!ticket) return;
-        if (!(await confirm({ title: "Mark this job as paid?", verb: "Slide to mark as paid" }))) return;
-        try {
-            setTicket(await billOrder(ticket.id));
-        } catch (e) {
-            console.error(e);
-        }
-    };
+    // Billing goes through the PaymentDialog (BACK-3-007), which records method + change then bills.
     // Download a PDF (Job Order or Invoice) and confirm where it landed. Pre-approval
     // (triage/estimate) copies are annotated "FOR CUSTOMER APPROVAL" so the signed estimate
     // isn't confused with the billed invoice.
@@ -402,6 +396,12 @@ export default function JobTicketPage() {
                                     {ticket.receipt_number && (
                                         <div className="text-sm text-muted-foreground">Receipt {ticket.receipt_number}</div>
                                     )}
+                                    {ticket.payment && (
+                                        <div className="text-sm text-muted-foreground">
+                                            Paid via {ticket.payment.method === "gcash" ? "GCash" : ticket.payment.method === "card" ? "Card" : "Cash"}
+                                            {ticket.payment.change_due > 0 ? ` · change ${formatMoney(ticket.payment.change_due, currency)}` : ""}
+                                        </div>
+                                    )}
                                     {ticket.started_at && ticket.completed_at && (
                                         <div className="text-xs text-muted-foreground">Time on job: {duration(ticket.started_at, ticket.completed_at)}</div>
                                     )}
@@ -421,7 +421,7 @@ export default function JobTicketPage() {
                                             </Button>
                                         )}
                                         {ticket.status === "done" && (
-                                            <Button className="flex-1" onClick={markPaid}>
+                                            <Button className="flex-1" onClick={() => setPaymentOpen(true)}>
                                                 Mark as Paid
                                             </Button>
                                         )}
@@ -442,6 +442,14 @@ export default function JobTicketPage() {
                                 open={discountsOpen}
                                 onOpenChange={setDiscountsOpen}
                                 onSaved={setTicket}
+                            />
+                        )}
+                        {isStaff && (
+                            <PaymentDialog
+                                ticket={ticket}
+                                open={paymentOpen}
+                                onOpenChange={setPaymentOpen}
+                                onPaid={setTicket}
                             />
                         )}
 

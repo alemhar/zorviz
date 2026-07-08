@@ -622,6 +622,18 @@ async fn order_detail(state: &ApiState, id: &str) -> Option<Value> {
         .unwrap_or_default();
     obj.insert("items".to_string(), Value::Array(items));
 
+    // BACK-3-007: the recorded payment (latest), if the job was billed with one.
+    if let Ok(Some(prow)) = sqlx::query(
+        "SELECT method, amount, tendered, change_due, processed_by, created_at \
+         FROM payments WHERE order_id = ? ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await
+    {
+        obj.insert("payment".to_string(), Value::Object(row_to_json(&prow)));
+    }
+
     Some(Value::Object(obj))
 }
 
@@ -1631,11 +1643,20 @@ pub async fn start_order(
     order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
 }
 
-/// POST /api/orders/:id/bill — assign a receipt number (once) and mark `paid`. Auth required.
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub struct BillReq {
+    method: Option<String>, // 'cash' | 'gcash' | 'card' (BACK-3-007)
+    tendered: Option<i64>, // centavos handed over (cash); defaults to the total
+}
+
+/// POST /api/orders/:id/bill — assign a receipt number (once), record the payment (BACK-3-007),
+/// and mark `paid`. Auth required; staff only.
 pub async fn bill_order(
     State(state): State<ApiState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    Json(req): Json<BillReq>,
 ) -> Result<Json<Value>, StatusCode> {
     require_staff(&state, &headers)?; // BACK-2-020: billing is front-desk work (mechanic → 403)
     // Only a finished job can be billed ('paid' allowed again — re-billing is idempotent
@@ -1669,13 +1690,53 @@ pub async fn bill_order(
         }
     };
 
+    let now = now_ms();
     sqlx::query("UPDATE orders SET receipt_number = ?, status = 'paid', updated_at = ? WHERE id = ?")
         .bind(&receipt)
-        .bind(now_ms())
+        .bind(now)
         .bind(&id)
         .execute(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Record the payment (BACK-3-007) when a method is given and none is recorded yet — keeps
+    // re-billing idempotent. amount = order total; change = tendered − total (clamped ≥ 0).
+    if let Some(method) = req.method.as_ref().map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()) {
+        let already: i64 = sqlx::query("SELECT COUNT(*) AS c FROM payments WHERE order_id = ?")
+            .bind(&id)
+            .fetch_one(&state.pool)
+            .await
+            .ok()
+            .and_then(|r| r.try_get::<i64, _>("c").ok())
+            .unwrap_or(0);
+        if already == 0 {
+            let total: i64 = sqlx::query("SELECT total FROM orders WHERE id = ? LIMIT 1")
+                .bind(&id)
+                .fetch_optional(&state.pool)
+                .await
+                .ok()
+                .flatten()
+                .and_then(|r| r.try_get::<i64, _>("total").ok())
+                .unwrap_or(0);
+            let tendered = req.tendered.unwrap_or(total);
+            let change_due = (tendered - total).max(0);
+            let processed_by = session_from_headers(&state, &headers).map(|s| s.name);
+            let _ = sqlx::query(
+                "INSERT INTO payments (id, order_id, method, amount, tendered, change_due, processed_by, created_at) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(uuid::Uuid::new_v4().to_string())
+            .bind(&id)
+            .bind(&method)
+            .bind(total)
+            .bind(tendered)
+            .bind(change_due)
+            .bind(&processed_by)
+            .bind(now)
+            .execute(&state.pool)
+            .await;
+        }
+    }
 
     order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
 }

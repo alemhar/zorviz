@@ -27,12 +27,22 @@ the inventory-page work.)_
 
 ---
 
-## BACK-3-007 · Billing & Payment Processing
+## BACK-3-007 · Billing & Payment Processing · *implemented, pending verification*
 
 **Priority:** 🟡 Medium  
 **Area:** `apps/desktop/src/features/repair/` (extends Job Ticket billing)  
 **Description:**  
 After a job is done, the cashier processes payment. This is an extension of BACK-2-009 with proper payment tracking.
+
+**Build notes / deviations (2026-07-08):**
+- **Kept status `paid`, did NOT add a `billed` status.** The canonical flow (D19) uses `paid`; a new
+  `billed` state would break the `OrderStatus` enum, badges, and gating. "Billed" = the existing
+  `paid` state. Deviates from the AC's "status → billed" wording deliberately.
+- **No JS `PaymentRepository`** (that's the pre-D23 Kysely-module pattern) — the equivalent is the
+  Rust `bill_order` handler recording the payment server-side. Data path stays HTTP API.
+- **Column `change_due`** (not `change`) to avoid SQL-keyword ambiguity.
+- Methods **Cash / GCash / Card**; tendered/change apply to Cash, GCash/Card are exact. Change clamped
+  ≥ 0; the dialog blocks a short cash tender. Payment recorded once (re-billing idempotent).
 
 **Acceptance Criteria:**
 - [ ] Payment form: Amount Tendered, Change Calculation

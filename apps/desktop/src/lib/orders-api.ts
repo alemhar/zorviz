@@ -49,6 +49,19 @@ export interface JobTicket {
     mechanic?: { id: string; name: string; role: string } | null;
     items?: OrderItem[];
     approval_proof?: { approved_by: string; method: string; at: number } | null;
+    payment?: {
+        method: string; // 'cash' | 'gcash' | 'card'
+        amount: number; // centavos
+        tendered: number; // centavos
+        change_due: number; // centavos
+        processed_by: string | null;
+        created_at: number;
+    } | null;
+}
+
+export interface PaymentInput {
+    method: string; // 'cash' | 'gcash' | 'card'
+    tendered: number; // centavos
 }
 
 export interface JobSummary {
@@ -141,8 +154,8 @@ export function cancelOrder(orderId: string, reason: string): Promise<JobTicket>
     return api.post<JobTicket>(`/api/orders/${orderId}/cancel`, { reason });
 }
 
-export function billOrder(orderId: string): Promise<JobTicket> {
-    return api.post<JobTicket>(`/api/orders/${orderId}/bill`);
+export function billOrder(orderId: string, input: PaymentInput): Promise<JobTicket> {
+    return api.post<JobTicket>(`/api/orders/${orderId}/bill`, input);
 }
 
 export function createOrder(input: {

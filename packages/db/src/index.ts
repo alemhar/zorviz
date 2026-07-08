@@ -19,6 +19,7 @@ export * from './modules/repair/order-photos';
 export * from './modules/commerce/order-items';
 export * from './modules/commerce/inventory';
 export * from './modules/commerce/inventory-adjustments';
+export * from './modules/commerce/payments';
 
 // Assembled schema
 export * from './database';
