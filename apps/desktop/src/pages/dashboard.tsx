@@ -18,6 +18,28 @@ interface DashboardStats {
     month_revenue: number;
 }
 
+// Abbreviated money for the compact mobile KPI strip (e.g. ₱6.4k) so 4 cells fit ~360px.
+function compactMoney(centavos: number, symbol: string): string {
+    const n = Math.round(centavos) / 100;
+    if (Math.abs(n) >= 1000) {
+        const k = n / 1000;
+        return `${symbol}${k.toFixed(k % 1 === 0 ? 0 : 1)}k`;
+    }
+    return `${symbol}${Math.round(n)}`;
+}
+
+type StatItem = {
+    key: string;
+    label: string;
+    short: string;
+    value: string;
+    valueShort?: string;
+    valueClass?: string;
+    iconWrap: string;
+    iconColor: string;
+    Icon: typeof Car;
+};
+
 export default function DashboardPage() {
     const { user, logout } = useAuthStore();
     const { config, fetchConfig } = useAppConfigStore();
@@ -104,6 +126,18 @@ export default function DashboardPage() {
         },
     ];
 
+    const currencySym = config?.currency_symbol ?? "";
+    // KPI strip (BACK-2-019): one compact row on mobile, comfortable cards on desktop.
+    // Degrades cleanly when a role sees fewer stats (mechanic has no revenue — BACK-2-015).
+    const statItems: StatItem[] = [
+        { key: "active", label: "Active Jobs", short: "Jobs", value: String(stats?.active_jobs ?? 0), iconWrap: "bg-blue-100 dark:bg-blue-900/30", iconColor: "text-blue-600 dark:text-blue-400", Icon: Car },
+        { key: "pending", label: "Pending Estimates", short: "Estimates", value: String(stats?.pending_estimates ?? 0), iconWrap: "bg-amber-100 dark:bg-amber-900/30", iconColor: "text-amber-600 dark:text-amber-400", Icon: ClipboardList },
+        { key: "low", label: "Low Stock", short: "Low Stock", value: String(stats?.low_stock ?? 0), valueClass: "text-destructive", iconWrap: "bg-red-100 dark:bg-red-900/30", iconColor: "text-red-600 dark:text-red-400", Icon: Package },
+        ...(!isMechanic
+            ? [{ key: "month", label: "This Month", short: "Month", value: formatMoney(stats?.month_revenue ?? 0, currencySym), valueShort: compactMoney(stats?.month_revenue ?? 0, currencySym), iconWrap: "bg-emerald-100 dark:bg-emerald-900/30", iconColor: "text-emerald-600 dark:text-emerald-400", Icon: TrendingUp }]
+            : []),
+    ];
+
     return (
         <div className="min-h-screen bg-background">
             <header className="border-b p-4 flex items-center justify-between bg-card/50 backdrop-blur-sm">
@@ -119,60 +153,39 @@ export default function DashboardPage() {
                     <Button variant="outline" size="sm" onClick={handleLogout}>Logout</Button>
                 </div>
             </header>
-            <main className="p-8 space-y-8">
+            <main className="p-4 sm:p-8 space-y-5 sm:space-y-8">
                 <div>
-                    <h2 className="text-3xl font-bold">Welcome back, {user?.name || 'User'}</h2>
-                    <p className="text-muted-foreground mt-1">Here's what's happening today</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold">Welcome back, {user?.name || 'User'}</h2>
+                    <p className="text-sm sm:text-base text-muted-foreground mt-1">Here's what's happening today</p>
                 </div>
 
-                {/* Stats Cards */}
-                <div className={`grid grid-cols-1 gap-4 ${isMechanic ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
-                    <div className="p-5 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                                <Car className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Active Jobs</p>
-                                <p className="text-2xl font-bold">{stats?.active_jobs ?? 0}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-5 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                                <ClipboardList className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Pending Estimates</p>
-                                <p className="text-2xl font-bold">{stats?.pending_estimates ?? 0}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-5 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-                                <Package className="w-5 h-5 text-red-600 dark:text-red-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Low Stock</p>
-                                <p className="text-2xl font-bold text-destructive">{stats?.low_stock ?? 0}</p>
-                            </div>
-                        </div>
-                    </div>
-                    {!isMechanic && (
-                        <div className="p-5 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                                    <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                {/* Stats Cards — compact one-row strip on mobile (BACK-2-019) */}
+                <div className={`grid gap-2 sm:gap-4 ${isMechanic ? "grid-cols-3" : "grid-cols-4"}`}>
+                    {statItems.map(({ key, label, short, value, valueShort, valueClass, iconWrap, iconColor, Icon }) => (
+                        <div key={key} className="p-2.5 sm:p-5 border rounded-xl bg-card shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-3 text-center sm:text-left">
+                                <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${iconWrap}`}>
+                                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${iconColor}`} />
                                 </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">This Month</p>
-                                    <p className="text-2xl font-bold">{formatMoney(stats?.month_revenue ?? 0, config?.currency_symbol ?? "")}</p>
+                                <div className="min-w-0">
+                                    <p className="text-[10px] leading-tight sm:text-sm text-muted-foreground truncate">
+                                        <span className="sm:hidden">{short}</span>
+                                        <span className="hidden sm:inline">{label}</span>
+                                    </p>
+                                    <p className={`text-base sm:text-2xl font-bold ${valueClass ?? ""}`}>
+                                        {valueShort ? (
+                                            <>
+                                                <span className="sm:hidden">{valueShort}</span>
+                                                <span className="hidden sm:inline">{value}</span>
+                                            </>
+                                        ) : (
+                                            value
+                                        )}
+                                    </p>
                                 </div>
                             </div>
                         </div>
-                    )}
+                    ))}
                 </div>
 
                 {/* Module Navigation */}
