@@ -299,3 +299,40 @@ senior discount (20% of ₱2,800), total ₱2,240** — math exact.
 - `package.json` (demo:seed / demo:reset), `docs/demo-credentials.md` (new)
 
 ---
+
+## ✅ BACK-1-C011 · Schema Domain Split
+
+**Completed:** 2026-07-08
+**Original Backlog ID:** BACK-1-001
+
+**What was implemented:**
+- Split the single `packages/db/src/types.ts` (all table interfaces + the `Database` map) into
+  domain-scoped files, exactly per the plan's layout:
+  - `core/` — `column-types.ts` (the shared `Nullable` helper + money/timestamp conventions),
+    `users.ts`, `customers.ts`, `sync-metadata.ts`, `app-config.ts`
+  - `modules/repair/` — `assets.ts`, `asset-types.ts`, `bookings.ts`, `orders.ts`,
+    `order-photos.ts` (order_photos + photo_notes)
+  - `modules/commerce/` — `order-items.ts`, `inventory.ts`, `inventory-adjustments.ts`
+- `database.ts` assembles the Kysely `Database` interface from the domain table types.
+- `index.ts` re-exports every domain file + `database.ts`, so all downstream consumers keep
+  importing from `@zorviz/db` unchanged (verified: only `index.ts` ever referenced `./types`).
+- Deleted the old `types.ts`.
+
+**Design decisions:**
+- Domain grouping follows the existing file's own section comments: `customers` sits in **core**
+  (a shared entity referenced across modules); `orders`/`asset-types`/`order-photos` go under
+  **repair**; `order-items`/`inventory`/`inventory-adjustments` under **commerce**.
+- The `Nullable` helper is now exported from `core/column-types.ts` (was module-private) so each
+  domain file can share it — purely additive to the public surface.
+
+**⚠️ Spec criterion dropped as obsolete:** "Drizzle schema files updated in parallel" — Drizzle was
+abandoned for Kysely (see CLAUDE.md / `.agent/known-issues`), so there are no Drizzle schema files.
+
+**Verification:** pure type-only refactor, no runtime/migration change. `tsc --noEmit` passes for the
+desktop app (the AC's gate) and the Vite production build succeeds — all workspace packages resolve
+the split.
+
+**Key files:**
+- `packages/db/src/core/*.ts`, `packages/db/src/modules/repair/*.ts`,
+  `packages/db/src/modules/commerce/*.ts`, `packages/db/src/database.ts` (all new)
+- `packages/db/src/index.ts` (re-exports), `packages/db/src/types.ts` (deleted)

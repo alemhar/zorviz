@@ -6,38 +6,6 @@
 
 ---
 
-## BACK-1-001 · Schema Domain Split
-
-**Priority:** Medium  
-**Area:** `packages/db`  
-**Description:**  
-Currently all table definitions (Core + all Module tables) live in a single `packages/db/src/types.ts` file. The plan calls for splitting these into domain-scoped files:
-
-```
-packages/db/src/
-  core/
-    users.ts
-    sync-metadata.ts
-    app-config.ts
-  modules/
-    repair/
-      assets.ts
-      bookings.ts
-    commerce/
-      orders.ts
-      order-items.ts
-      inventory.ts
-```
-
-**Acceptance Criteria:**
-- [ ] Core tables extracted to `packages/db/src/core/`
-- [ ] Module tables extracted per domain under `packages/db/src/modules/`
-- [ ] Root `index.ts` re-exports everything so downstream consumers are not broken
-- [ ] Drizzle schema files updated in parallel if applicable
-- [ ] All existing types still resolve without errors (`tsc --noEmit` passes)
-
----
-
 ## BACK-1-002 · Module Loader / Registry
 
 **Priority:** Low (hardcoded acceptable for now per plan)  
