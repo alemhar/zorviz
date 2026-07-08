@@ -273,7 +273,7 @@ export default function SetupPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="username">Username *</Label>
-                                <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="used to log in" />
+                                <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="used to log in" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2">

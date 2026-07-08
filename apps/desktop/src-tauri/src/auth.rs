@@ -97,7 +97,9 @@ pub async fn login(
     State(state): State<ApiState>,
     Json(req): Json<LoginReq>,
 ) -> Result<Json<LoginRes>, (StatusCode, String)> {
-    let username = req.username.trim().to_string();
+    // Usernames are case-insensitive and stored lowercase (BACK-2-021). Normalizing here
+    // covers both the DB lookup and the lockout-map key (so "Boy"/"boy" share a fail counter).
+    let username = req.username.trim().to_lowercase();
     let now = now_ms();
 
     // Lockout check

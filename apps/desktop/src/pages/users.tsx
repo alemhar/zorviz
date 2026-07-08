@@ -153,7 +153,7 @@ export default function UsersPage() {
                         {creating && (
                             <div className="space-y-1">
                                 <Label htmlFor="uusername">Username</Label>
-                                <Input id="uusername" value={username} onChange={(e) => setUsername(e.target.value)} />
+                                <Input id="uusername" value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} />
                             </div>
                         )}
                         <div className="space-y-1">

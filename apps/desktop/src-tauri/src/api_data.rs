@@ -947,7 +947,7 @@ pub async fn setup(
     )
     .bind(uuid::Uuid::new_v4().to_string())
     .bind(req.admin_name.trim())
-    .bind(req.admin_username.trim())
+    .bind(req.admin_username.trim().to_lowercase()) // BACK-2-021: store usernames lowercase
     .bind(&hash)
     .bind(&salt)
     .bind(now)
@@ -1241,7 +1241,7 @@ pub async fn create_user(
     Json(req): Json<CreateUserReq>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     require_admin(&state, &headers).map_err(|s| (s, "admin only".to_string()))?;
-    let username = req.username.trim().to_string();
+    let username = req.username.trim().to_lowercase(); // BACK-2-021: store usernames lowercase
     if req.name.trim().is_empty() || username.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "name and username are required".to_string()));
     }

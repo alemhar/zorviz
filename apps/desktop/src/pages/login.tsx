@@ -68,6 +68,9 @@ export default function LoginPage() {
                                 onChange={(e) => setUsername(e.target.value)}
                                 autoFocus
                                 required
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
                             />
                         </div>
                         <div className="space-y-2">
