@@ -30,6 +30,7 @@ export interface AppConfigTable {
     cloud_url: Nullable<string>; // backend base URL (null = not linked)
     device_token: Nullable<string>; // bearer token for authenticated sync
     sync_enabled: number; // 1 = cloud sync on; 0 = off (default)
+    last_synced_at: number; // cloud watermark: epoch ms of the last successful push (0 = never)
     created_at: number;
     updated_at: number;
 }

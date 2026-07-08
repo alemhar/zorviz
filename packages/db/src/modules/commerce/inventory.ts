@@ -10,6 +10,8 @@ export interface InventoryTable {
     reorder_point: number;
     unit_cost: number; // centavos
     unit_price: number; // centavos
+    created_at: number; // added 0020 (sync change-tracking)
+    updated_at: number; // touched on every write
 }
 
 export type InventoryItem = Selectable<InventoryTable>;

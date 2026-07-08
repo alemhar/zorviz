@@ -60,7 +60,7 @@ pub async fn update_inventory(
     }
     let desc = req.description.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     let result = sqlx::query(
-        "UPDATE inventory SET name = ?, sku = ?, description = ?, reorder_point = ?, unit_cost = ?, unit_price = ? WHERE id = ?",
+        "UPDATE inventory SET name = ?, sku = ?, description = ?, reorder_point = ?, unit_cost = ?, unit_price = ?, updated_at = ? WHERE id = ?",
     )
     .bind(req.name.trim())
     .bind(req.sku.trim())
@@ -68,6 +68,7 @@ pub async fn update_inventory(
     .bind(req.reorder_point)
     .bind(req.unit_cost)
     .bind(req.unit_price)
+    .bind(now_ms())
     .bind(&id)
     .execute(&state.pool)
     .await
@@ -134,8 +135,9 @@ pub async fn adjust_inventory(
     if req.delta == 0.0 {
         return Err((StatusCode::BAD_REQUEST, "quantity can't be zero".to_string()));
     }
-    let result = sqlx::query("UPDATE inventory SET stock_on_hand = stock_on_hand + ? WHERE id = ?")
+    let result = sqlx::query("UPDATE inventory SET stock_on_hand = stock_on_hand + ?, updated_at = ? WHERE id = ?")
         .bind(req.delta)
+        .bind(now_ms())
         .bind(&id)
         .execute(&state.pool)
         .await
@@ -235,9 +237,10 @@ pub async fn import_inventory(
             format!("{}-{}", slug.trim_matches('-'), &id[..4])
         });
         let desc = item.description.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        let now = now_ms();
         let ok = sqlx::query(
-            "INSERT INTO inventory (id, sku, name, description, stock_on_hand, reorder_point, unit_cost, unit_price) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO inventory (id, sku, name, description, stock_on_hand, reorder_point, unit_cost, unit_price, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(&sku)
@@ -247,6 +250,8 @@ pub async fn import_inventory(
         .bind(item.reorder_point.unwrap_or(5.0))
         .bind(item.unit_cost.unwrap_or(0))
         .bind(item.unit_price.unwrap_or(0))
+        .bind(now)
+        .bind(now)
         .execute(&state.pool)
         .await
         .is_ok();

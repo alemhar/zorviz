@@ -19,6 +19,11 @@
 >   **Fail-safe by design** — every failure (no backend, unreachable, timeout, 401) is caught + backed
 >   off; it never throws/blocks, so a *mistaken enable with no backend* just reads "can't reach cloud"
 >   and the app keeps running fully local.
+> - **Sync protocol locked** — [`docs/cloud-sync-protocol.md`](../cloud-sync-protocol.md) (v1: push-only,
+>   `updated_at` watermark, TLS, tenant-scoped). Both the desktop client and the future backend build to it.
+> - **Change-tracking schema shipped** (migration 0020): `inventory` + `order_items` gained
+>   `created_at`/`updated_at` (touched on every write in Rust), and `app_config` gained the
+>   `last_synced_at` watermark — so an incremental push can answer "what changed since X."
 > - **Still parked:** the actual push/pull wire protocol (guarded stub — only runs once connected) + the
 >   whole cloud backend (Postgres, Next.js, sync API). Built together later so the protocol matches;
 >   enabling a shop then = config, not a build.

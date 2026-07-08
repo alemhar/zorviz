@@ -559,8 +559,9 @@ async fn adjust_stock_for_order(state: &ApiState, order_id: &str, sign: f64) {
             let inv_id: Option<String> = r.try_get("inventory_item_id").ok();
             let qty: f64 = r.try_get("quantity").unwrap_or(0.0);
             if let Some(inv_id) = inv_id {
-                let _ = sqlx::query("UPDATE inventory SET stock_on_hand = stock_on_hand + ? WHERE id = ?")
+                let _ = sqlx::query("UPDATE inventory SET stock_on_hand = stock_on_hand + ?, updated_at = ? WHERE id = ?")
                     .bind(sign * qty)
+                    .bind(now_ms())
                     .bind(&inv_id)
                     .execute(&state.pool)
                     .await;
@@ -692,9 +693,10 @@ pub async fn create_inventory(
         format!("{}-{}", slug.trim_matches('-'), &id[..4])
     });
     let desc = req.description.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let now = now_ms();
     sqlx::query(
-        "INSERT INTO inventory (id, sku, name, description, stock_on_hand, reorder_point, unit_cost, unit_price) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO inventory (id, sku, name, description, stock_on_hand, reorder_point, unit_cost, unit_price, created_at, updated_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&sku)
@@ -704,6 +706,8 @@ pub async fn create_inventory(
     .bind(req.reorder_point.unwrap_or(5.0))
     .bind(req.unit_cost.unwrap_or(0))
     .bind(req.unit_price.unwrap_or(0))
+    .bind(now)
+    .bind(now)
     .execute(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -804,9 +808,10 @@ pub async fn save_estimate(
         let total = (item.quantity * item.unit_price as f64).round() as i64;
         subtotal += total;
         let unit = item.unit.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        let now = now_ms();
         sqlx::query(
-            "INSERT INTO order_items (id, order_id, type, description, quantity, unit, unit_price, total, inventory_item_id) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO order_items (id, order_id, type, description, quantity, unit, unit_price, total, inventory_item_id, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(uuid::Uuid::new_v4().to_string())
         .bind(&id)
@@ -817,6 +822,8 @@ pub async fn save_estimate(
         .bind(item.unit_price)
         .bind(total)
         .bind(&item.inventory_item_id)
+        .bind(now)
+        .bind(now)
         .execute(&state.pool)
         .await
         .map_err(|_| ise())?;
@@ -1505,8 +1512,9 @@ pub async fn complete_item(
         _ => return Err(StatusCode::CONFLICT),
     }
 
-    sqlx::query("UPDATE order_items SET completed = ? WHERE id = ?")
+    sqlx::query("UPDATE order_items SET completed = ?, updated_at = ? WHERE id = ?")
         .bind(if req.completed { 1 } else { 0 })
+        .bind(now_ms())
         .bind(&item_id)
         .execute(&state.pool)
         .await
