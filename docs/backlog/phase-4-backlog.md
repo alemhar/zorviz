@@ -1,7 +1,22 @@
 # Phase 4 Backlog — Cloud Link
 
-> **Status:** ~10% Complete (types + sync queue scaffolded, not integrated). **Backend parked.**  
-> **Scope:** Postgres Mirror, Sync Engine, Next.js Dashboard, Customer Portal  
+> **Status:** **v1 CLOUD DELIVERED 2026-07-08** — an interim Laravel backend (separate repo:
+> **`github.com/wurkz/cloud`**, local path `D:\Projects\zorviz-cloud`) per
+> [`docs/cloud-backend-architecture.md`](../cloud-backend-architecture.md), verified end-to-end
+> against the real desktop app (full sync + role-gated dashboards). Not yet deployed to Hostinger.
+> **Scope:** ~~Postgres Mirror, Next.js Dashboard~~ → Laravel + MySQL (interim, migrate on slowdown)
+> **Item disposition:**
+> - **BACK-4-001** (Next.js scaffold) + **BACK-4-002** (Postgres mirror) — **superseded** by the
+>   Laravel/MySQL decision; the mirror schema is delivered as Laravel migrations (composite
+>   `(tenant_id, id)` PKs).
+> - **BACK-4-003** (sync transport) + **BACK-4-004** (cloud sync endpoints) — **delivered**: desktop
+>   client (this repo) + `/api/health` & `/api/sync/push` (cloud repo), per the locked protocol.
+> - **BACK-4-005** (device registration & auth) — **delivered**: Sanctum device tokens, issued from
+>   the platform-admin panel, revocable; token→tenant server-side.
+> - **BACK-4-006** (owner remote dashboard) — **delivered (v1)**: owner/shop-admin dashboards with
+>   the money gate, plus a platform-admin panel (suspend/activate = kill-switch, partially covering
+>   BACK-0-012's cloud side; the local app deliberately keeps running).
+> - **BACK-4-007** (customer booking portal) and **BACK-4-008** (encrypted diff sync) — **still open**, below.
 > **Completed items live in:** [`phase-4-completed.md`](./phase-4-completed.md)
 
 > **Client-side prep shipped in the desktop app (2026-07-08)** so enabling cloud later needs no
