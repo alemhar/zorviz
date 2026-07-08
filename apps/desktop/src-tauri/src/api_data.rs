@@ -473,6 +473,8 @@ pub async fn create_order(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    log_transition(&state, &id, None, "triage", Some(session.name)).await;
+
     order_detail(&state, &id).await.ok_or(StatusCode::INTERNAL_SERVER_ERROR).map(Json)
 }
 
@@ -541,7 +543,27 @@ pub async fn approve_order(
     // as an oversell on the low-stock report rather than blocking the shop mid-approval.
     adjust_stock_for_order(&state, &id, -1.0).await;
 
+    let actor = session_from_headers(&state, &headers).map(|s| s.name);
+    log_transition(&state, &id, Some("estimate"), "approved", actor).await;
+
     order_detail(&state, &id).await.ok_or((StatusCode::NOT_FOUND, "not found".to_string())).map(Json)
+}
+
+// Append a row to the job-movement log (0022). Best-effort — analytics must never fail the
+// operation itself. from_status None = ticket created.
+async fn log_transition(state: &ApiState, order_id: &str, from: Option<&str>, to: &str, actor: Option<String>) {
+    let _ = sqlx::query(
+        "INSERT INTO order_status_history (id, order_id, from_status, to_status, actor, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(order_id)
+    .bind(from)
+    .bind(to)
+    .bind(&actor)
+    .bind(now_ms())
+    .execute(&state.pool)
+    .await;
 }
 
 // Apply each inventory-linked line item's quantity × sign to stock_on_hand.
@@ -791,7 +813,8 @@ pub async fn save_estimate(
     }
 
     // The estimate is only editable before approval (guarded BEFORE deleting items).
-    match order_status(&state, &id).await.as_deref() {
+    let prior_status = order_status(&state, &id).await;
+    match prior_status.as_deref() {
         None => return Err((StatusCode::NOT_FOUND, "order not found".to_string())),
         Some("triage") | Some("estimate") => {}
         Some(s) => return Err((StatusCode::CONFLICT, format!("The estimate can no longer be edited (this job is {}).", s))),
@@ -876,6 +899,11 @@ pub async fn save_estimate(
     .execute(&state.pool)
     .await
     .map_err(|_| ise())?;
+
+    if prior_status.as_deref() == Some("triage") {
+        let actor = session_from_headers(&state, &headers).map(|s| s.name);
+        log_transition(&state, &id, Some("triage"), "estimate", actor).await;
+    }
 
     order_detail(&state, &id).await.ok_or((StatusCode::NOT_FOUND, "not found".to_string())).map(Json)
 }
@@ -1531,7 +1559,8 @@ pub async fn complete_item(
         .ok_or(StatusCode::NOT_FOUND)?;
 
     // Work items are only tickable while the job is actually executable.
-    match order_status(&state, &order_id).await.as_deref() {
+    let prior_status = order_status(&state, &order_id).await;
+    match prior_status.as_deref() {
         Some("approved") | Some("in_progress") => {}
         _ => return Err(StatusCode::CONFLICT),
     }
@@ -1552,6 +1581,11 @@ pub async fn complete_item(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    if prior_status.as_deref() == Some("approved") {
+        let actor = session_from_headers(&state, &headers).map(|s| s.name);
+        log_transition(&state, &order_id, Some("approved"), "in_progress", actor).await;
+    }
+
     order_detail(&state, &order_id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
 }
 
@@ -1564,7 +1598,8 @@ pub async fn mark_done(
     if session_from_headers(&state, &headers).is_none() {
         return Err(StatusCode::UNAUTHORIZED);
     }
-    match order_status(&state, &id).await.as_deref() {
+    let prior_status = order_status(&state, &id).await;
+    match prior_status.as_deref() {
         None => return Err(StatusCode::NOT_FOUND),
         Some("approved") | Some("in_progress") => {}
         _ => return Err(StatusCode::CONFLICT),
@@ -1578,6 +1613,10 @@ pub async fn mark_done(
         .execute(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let actor = session_from_headers(&state, &headers).map(|s| s.name);
+    log_transition(&state, &id, prior_status.as_deref(), "done", actor).await;
+
     order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
 }
 
@@ -1623,6 +1662,8 @@ pub async fn cancel_order(
         .await
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "cancel failed".to_string()))?;
 
+    log_transition(&state, &id, status.as_deref(), "cancelled", actor.clone()).await;
+
     // Stock was deducted at approval (D6) — cancelling an already-approved job puts the
     // linked parts back so inventory doesn't drift.
     if matches!(status.as_deref(), Some("approved") | Some("in_progress") | Some("done")) {
@@ -1665,6 +1706,7 @@ pub async fn start_order(
         }
     }
 
+    let prior_status = order_status(&state, &id).await;
     sqlx::query(
         "UPDATE orders SET status = 'in_progress', started_at = COALESCE(started_at, ?), updated_at = ? \
          WHERE id = ? AND status IN ('approved', 'in_progress')",
@@ -1675,6 +1717,10 @@ pub async fn start_order(
     .execute(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if prior_status.as_deref() == Some("approved") {
+        log_transition(&state, &id, Some("approved"), "in_progress", Some(session.name.clone())).await;
+    }
 
     // A mechanic starting an unassigned job claims it.
     if is_mechanic {
@@ -1798,6 +1844,10 @@ pub async fn bill_order(
         .await
         .map_err(ise)?;
 
+    if settled {
+        log_transition(&state, &id, Some("done"), "paid", processed_by.clone()).await;
+    }
+
     order_detail(&state, &id).await.ok_or((StatusCode::NOT_FOUND, "not found".to_string())).map(Json)
 }
 
@@ -1820,7 +1870,7 @@ pub async fn sync_changes(
     let since = q.since.unwrap_or(0);
     let tenant = tenant_id(&state).await;
     // (table, change-marker column) — must match docs/cloud-sync-protocol.md §5.
-    let specs: [(&str, &str); 11] = [
+    let specs: [(&str, &str); 12] = [
         ("customers", "updated_at"),
         ("assets", "updated_at"),
         ("asset_types", "updated_at"),
@@ -1832,6 +1882,7 @@ pub async fn sync_changes(
         ("payments", "created_at"),
         ("expenses", "updated_at"),        // BACK-3-010 (soft-void bumps updated_at)
         ("drawer_sessions", "updated_at"), // BACK-3-011 (close bumps updated_at)
+        ("order_status_history", "created_at"), // 0022: append-only movement log
     ];
     let mut tables = serde_json::Map::new();
     let mut count = 0usize;

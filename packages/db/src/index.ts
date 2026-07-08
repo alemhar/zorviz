@@ -14,6 +14,7 @@ export * from './modules/repair/asset-types';
 export * from './modules/repair/bookings';
 export * from './modules/repair/orders';
 export * from './modules/repair/order-photos';
+export * from './modules/repair/order-status-history';
 
 // Commerce module
 export * from './modules/commerce/order-items';

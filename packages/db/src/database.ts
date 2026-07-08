@@ -7,6 +7,7 @@ import type { AssetTypesTable } from './modules/repair/asset-types';
 import type { BookingsTable } from './modules/repair/bookings';
 import type { OrdersTable } from './modules/repair/orders';
 import type { OrderPhotosTable, PhotoNotesTable } from './modules/repair/order-photos';
+import type { OrderStatusHistoryTable } from './modules/repair/order-status-history';
 import type { OrderItemsTable } from './modules/commerce/order-items';
 import type { InventoryTable } from './modules/commerce/inventory';
 import type { InventoryAdjustmentsTable } from './modules/commerce/inventory-adjustments';
@@ -33,4 +34,5 @@ export interface Database {
     payments: PaymentsTable;
     expenses: ExpensesTable;
     drawer_sessions: DrawerSessionsTable;
+    order_status_history: OrderStatusHistoryTable;
 }
