@@ -300,7 +300,7 @@ function ItemDialog({ item, currency, onClose, onSaved }: { item: Part | null; c
                         <Label htmlFor="inv-desc">Description</Label>
                         <Input id="inv-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         {!item && (
                             <div className="space-y-1">
                                 <Label htmlFor="inv-stock">Initial Stock</Label>
