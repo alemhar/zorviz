@@ -152,6 +152,12 @@ Money stays integer centavos; timestamps integer epoch-ms (MySQL `BIGINT`).
    is a given. Owner sees money; **admin is operations-only by default** with an owner-controlled
    per-shop "show money to admins" toggle (default off). **Inventory = operations** (fully visible
    to admins, incl. cost/margin).
+7. **Multi-shop owners:** ✅ **Option A — shop = tenant.** Each desktop install stays its own tenant
+   (self-generated `tenant_id`, as shipped); an owner with several shops is linked to each tenant via
+   `tenant_user` and the dashboard shows all of them (shop switcher + combined view). **No `branch_id`**
+   in the cloud model — locations are operationally independent shops; the desktop is unchanged. If a
+   customer ever needs locations acting as ONE business (shared inventory/customers), revisit as a
+   separate "organization" grouping — additive, cloud-side only.
 
 ## 10. Longevity & migration trigger
 
