@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent, ThemeSwitcher } from "@zorviz/ui";
 import { ArrowLeft, Store, Coins, Monitor, ListPlus, Plus, Trash2, Image as ImageIcon, FileText, Palette, QrCode, Cloud, Copy, Check } from "lucide-react";
 import { LanQr } from "../components/lan-qr";
+import { runSync } from "../lib/cloud-sync";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
 import { useDyslexiaStore } from "../stores/dyslexia";
@@ -608,6 +609,19 @@ export default function SettingsPage() {
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">Register this ID in your cloud backend to link this shop.</p>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 border-t pt-4">
+                            <div className="text-xs text-muted-foreground">
+                                {config?.last_synced_at ? `Last synced ${new Date(config.last_synced_at).toLocaleString()}` : "Never synced"}
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={config?.sync_enabled !== 1 || !config?.cloud_url}
+                                onClick={() => void runSync()}
+                            >
+                                Sync now
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>

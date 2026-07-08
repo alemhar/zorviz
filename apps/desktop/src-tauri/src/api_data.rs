@@ -1759,3 +1759,66 @@ pub async fn bill_order(
 
     order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
 }
+
+// ---- Cloud sync (BACK-4 prep; see docs/cloud-sync-protocol.md) ----
+
+#[derive(Deserialize)]
+pub struct SinceQuery {
+    since: Option<i64>,
+}
+
+/// GET /api/sync/changes?since=<ms> — assemble the tenant-scoped push batch: every synced table's
+/// rows changed since the watermark (updated_at for mutable tables, created_at for append-only).
+/// Local read only; the desktop then POSTs this to the cloud. Staff only.
+pub async fn sync_changes(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Query(q): Query<SinceQuery>,
+) -> Result<Json<Value>, StatusCode> {
+    require_staff(&state, &headers)?;
+    let since = q.since.unwrap_or(0);
+    let tenant = tenant_id(&state).await;
+    // (table, change-marker column) — must match docs/cloud-sync-protocol.md §5.
+    let specs: [(&str, &str); 9] = [
+        ("customers", "updated_at"),
+        ("assets", "updated_at"),
+        ("asset_types", "updated_at"),
+        ("bookings", "updated_at"),
+        ("orders", "updated_at"),
+        ("order_items", "updated_at"),
+        ("inventory", "updated_at"),
+        ("inventory_adjustments", "created_at"),
+        ("payments", "created_at"),
+    ];
+    let mut tables = serde_json::Map::new();
+    let mut count = 0usize;
+    for (table, marker) in specs {
+        let sql = format!("SELECT * FROM {table} WHERE {marker} > ?");
+        if let Ok(rows) = sqlx::query(&sql).bind(since).fetch_all(&state.pool).await {
+            let arr: Vec<Value> = rows.iter().map(|r| Value::Object(row_to_json(r))).collect();
+            count += arr.len();
+            tables.insert(table.to_string(), Value::Array(arr));
+        }
+    }
+    Ok(Json(json!({ "tenant_id": tenant, "since": since, "count": count, "tables": Value::Object(tables) })))
+}
+
+#[derive(Deserialize)]
+pub struct WatermarkReq {
+    ts: i64,
+}
+
+/// POST /api/sync/watermark — advance the local sync watermark after a successful cloud push. Staff only.
+pub async fn set_watermark(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(req): Json<WatermarkReq>,
+) -> Result<Json<Value>, StatusCode> {
+    require_staff(&state, &headers)?;
+    sqlx::query("UPDATE app_config SET last_synced_at = ? WHERE id = 'default'")
+        .bind(req.ts)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(json!({ "ok": true })))
+}

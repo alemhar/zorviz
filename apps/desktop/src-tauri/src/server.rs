@@ -175,6 +175,8 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
         .route("/api/backups", get(api_data::list_backups))
         .route("/api/restore", post(api_data::restore_backup))
         .route("/api/backup-dir", post(api_data::set_backup_dir))
+        .route("/api/sync/changes", get(api_data::sync_changes))
+        .route("/api/sync/watermark", post(api_data::set_watermark))
         .route(
             "/api/inventory",
             get(api_data::search_inventory).post(api_data::create_inventory),

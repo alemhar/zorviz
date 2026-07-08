@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAppConfigStore } from "../stores/app-config";
 import { useCloudSyncStore } from "../stores/cloud-sync";
+import { runSync } from "../lib/cloud-sync";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const HEALTHY_INTERVAL = 60_000; // recheck a good connection every 60s
@@ -50,8 +51,8 @@ export function CloudSyncManager() {
                 if (res.ok) {
                     failures = 0;
                     setStatus("connected", "Cloud reachable");
-                    // TODO(backend): once connected, run the sync engine push/pull here.
-                    // Parked until the cloud API exists so we don't lock in a wire format.
+                    // Connected → push local changes (fail-safe; sets its own status).
+                    void runSync();
                 } else if (res.status === 401 || res.status === 403) {
                     failures++;
                     setStatus("error", "Device token rejected");

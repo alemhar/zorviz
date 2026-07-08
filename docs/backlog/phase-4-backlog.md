@@ -24,9 +24,13 @@
 > - **Change-tracking schema shipped** (migration 0020): `inventory` + `order_items` gained
 >   `created_at`/`updated_at` (touched on every write in Rust), and `app_config` gained the
 >   `last_synced_at` watermark — so an incremental push can answer "what changed since X."
-> - **Still parked:** the actual push/pull wire protocol (guarded stub — only runs once connected) + the
->   whole cloud backend (Postgres, Next.js, sync API). Built together later so the protocol matches;
->   enabling a shop then = config, not a build.
+> - **Push implemented (client side)** — local endpoints `GET /api/sync/changes` (assembles the
+>   tenant-scoped batch of rows changed since the watermark) + `POST /api/sync/watermark` (advance);
+>   `lib/cloud-sync.ts` `runSync()` collects → `POST {cloud_url}/sync/push` → advances the watermark;
+>   runs on each healthy connect + a "Sync now" button in Settings. Fail-safe (can't succeed until the
+>   backend answers — degrades to "can't reach cloud", zero local impact).
+> - **Still parked:** the cloud **backend** itself (implements `/health` + `/sync/push` to the locked
+>   spec), plus pull/bidirectional, media sync, and app-layer encryption. Enabling a shop then = config.
 
 ---
 
