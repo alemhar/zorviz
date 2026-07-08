@@ -367,7 +367,7 @@ export default function JobTicketPage() {
                             </Card>
                         )}
 
-                        {(ticket.status === "done" || ticket.status === "paid") && (
+                        {isStaff && (ticket.status === "done" || ticket.status === "paid") && (
                             <Card>
                                 <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                                     <CardTitle className="text-sm">Billing</CardTitle>

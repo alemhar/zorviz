@@ -1586,9 +1586,7 @@ pub async fn bill_order(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, StatusCode> {
-    if session_from_headers(&state, &headers).is_none() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    require_staff(&state, &headers)?; // BACK-2-020: billing is front-desk work (mechanic → 403)
     // Only a finished job can be billed ('paid' allowed again — re-billing is idempotent
     // and reuses the receipt number).
     match order_status(&state, &id).await.as_deref() {
