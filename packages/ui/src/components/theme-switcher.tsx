@@ -5,53 +5,68 @@ import { Button } from "./ui/button"
 import { cn } from "../lib/utils"
 import { useTheme } from "next-themes"
 
+// Each swatch previews ITS OWN theme color (BACK-2-029) — fixed values mirroring the
+// [data-theme] --primary tokens in styles.css, independent of the active theme. (The old
+// version painted every swatch with the live --primary and used runtime-built Tailwind
+// classes that the compiler purged.)
+const SWATCHES: Record<string, string> = {
+  zinc: "hsl(240 5.9% 10%)",
+  red: "hsl(0 72% 51%)",
+  orange: "hsl(24 94% 53%)",
+  yellow: "hsl(47 95% 56%)",
+  green: "hsl(142 76% 36%)",
+  blue: "hsl(221 83% 53%)",
+  purple: "hsl(262 83% 58%)",
+  pink: "hsl(320 70% 50%)",
+  brown: "hsl(24 45% 40%)",
+}
+
+// Light/Dark plus two dyslexia-friendly tinted light modes (BACK-2-029): warm cream and a
+// soft blue reduce glare/visual stress (Irlen-style). Token classes live in styles.css.
+const MODES: { value: string; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "cream", label: "Tint Cream" },
+  { value: "tint-blue", label: "Tint Blue" },
+]
+
 export function ThemeSwitcher() {
   const { color, setColor } = useThemeColor()
   const { theme, setTheme } = useTheme()
 
-  const colors = [
-    "zinc", "red", "orange", "yellow", "green", 
-    "blue", "purple", "pink", "brown"
-  ]
-
   return (
     <div className="flex flex-col gap-4 p-4 border rounded-lg bg-card text-card-foreground">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium">Mode</h3>
-        <Button 
-          variant={theme === 'light' ? 'default' : 'outline'} 
-          size="sm" 
-          onClick={() => setTheme('light')}
-        >
-          Light
-        </Button>
-        <Button 
-          variant={theme === 'dark' ? 'default' : 'outline'} 
-          size="sm" 
-          onClick={() => setTheme('dark')}
-        >
-          Dark
-        </Button>
+        {MODES.map((m) => (
+          <Button
+            key={m.value}
+            variant={theme === m.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTheme(m.value)}
+          >
+            {m.label}
+          </Button>
+        ))}
       </div>
 
       <div className="space-y-2">
         <h3 className="text-sm font-medium">Color Theme</h3>
         <div className="flex flex-wrap gap-2">
-          {colors.map((c) => (
-            <Button
+          {Object.keys(SWATCHES).map((c) => (
+            <button
               key={c}
-              variant="outline"
-              size="sm"
+              type="button"
               className={cn(
-                "w-8 h-8 rounded-full p-0 border-2",
-                color === c ? "border-primary" : "border-transparent"
+                "w-8 h-8 rounded-full transition-shadow",
+                color === c && "ring-2 ring-foreground ring-offset-2 ring-offset-card"
               )}
-              style={{ backgroundColor: `hsl(var(--${c === "zinc" ? "primary" : "primary"}))` }} // simplified preview
-              onClick={() => setColor(c as any)}
+              style={{ backgroundColor: SWATCHES[c] }}
+              onClick={() => setColor(c as never)}
               title={c}
-            >
-              <span className={cn("w-4 h-4 rounded-full", `bg-${c}-500`)} />
-            </Button>
+              aria-label={`${c} color theme`}
+              aria-pressed={color === c}
+            />
           ))}
         </div>
       </div>

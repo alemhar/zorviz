@@ -48,6 +48,44 @@
     --ring: 212.7 26.8% 83.9%;
   }
 
+
+  /* --- Tint Modes (BACK-2-029): dyslexia-friendly tinted light backgrounds --- */
+  /* Cream + soft blue reduce glare/visual stress (Irlen-style). Light-mode variants: only the
+     surface tokens shift; foregrounds stay dark and color themes (--primary) apply on top. */
+  .cream {
+    --background: 45 56% 94%;
+    --foreground: 35 30% 13%;
+    --card: 45 50% 97%;
+    --card-foreground: 35 30% 13%;
+    --popover: 45 50% 97%;
+    --popover-foreground: 35 30% 13%;
+    --secondary: 44 38% 88%;
+    --secondary-foreground: 35 30% 15%;
+    --muted: 44 38% 88%;
+    --muted-foreground: 38 15% 38%;
+    --accent: 44 38% 88%;
+    --accent-foreground: 35 30% 15%;
+    --border: 42 28% 80%;
+    --input: 42 28% 80%;
+  }
+
+  .tint-blue {
+    --background: 213 55% 94%;
+    --foreground: 218 35% 14%;
+    --card: 213 48% 97%;
+    --card-foreground: 218 35% 14%;
+    --popover: 213 48% 97%;
+    --popover-foreground: 218 35% 14%;
+    --secondary: 213 36% 88%;
+    --secondary-foreground: 218 35% 16%;
+    --muted: 213 36% 88%;
+    --muted-foreground: 216 18% 40%;
+    --accent: 213 36% 88%;
+    --accent-foreground: 218 35% 16%;
+    --border: 214 28% 80%;
+    --input: 214 28% 80%;
+  }
+
   /* --- Color Themes --- */
   
   /* Red */

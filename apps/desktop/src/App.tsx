@@ -35,7 +35,12 @@ function App() {
   }, [fetchConfig, fetchLicense]);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      themes={["light", "dark", "cream", "tint-blue"]}
+    >
       {!isChecked ? (
         <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
           Loading…

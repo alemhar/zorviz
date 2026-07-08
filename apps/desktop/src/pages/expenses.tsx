@@ -93,9 +93,9 @@ export default function ExpensesPage() {
     const catLabel = (key: string) => EXPENSE_CATEGORIES.find((c) => c.key === key)?.label ?? key;
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-            <header className="px-4 py-3 bg-white dark:bg-slate-800 shadow-sm flex items-center gap-3">
-                <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+        <div className="min-h-screen bg-background">
+            <header className="px-4 py-3 bg-card shadow-sm flex items-center gap-3">
+                <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-lg hover:bg-muted">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <Wallet className="w-5 h-5 text-primary" />

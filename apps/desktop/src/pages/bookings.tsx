@@ -117,10 +117,10 @@ export default function BookingsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-            <header className="px-4 py-3 bg-white dark:bg-slate-800 shadow-sm flex items-center justify-between sticky top-0 z-10">
+        <div className="min-h-screen bg-background">
+            <header className="px-4 py-3 bg-card shadow-sm flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                    <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-lg hover:bg-muted">
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <h1 className="text-lg font-bold">Bookings</h1>
