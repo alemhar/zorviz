@@ -1,6 +1,6 @@
 # Phase 2 Backlog — Repair Module
 
-> **Status:** Fourteen open items — BACK-2-015 (mechanic dashboard cleanup + backup API gating — *implemented, pending verification*), BACK-2-016 (Start Job role logic + on-behalf start — *implemented, pending verification*), BACK-2-017 (ticket back-navigation — *implemented, pending verification*), BACK-2-018 (Appearance -> Settings — *implemented, pending verification*), BACK-2-019 (mobile one-row KPI strip — *implemented, pending verification*), BACK-2-020 (billing actions staff-only — *implemented, pending verification*), BACK-2-021 (case-insensitive usernames — *implemented, pending verification*), BACK-2-022 (slide-to-confirm on actions — *implemented, pending verification*), BACK-2-023 (assign staff-only — *implemented, pending verification*), BACK-2-024 (responsive estimate dialog — *implemented (estimate, discounts + inventory dialogs audited); pending verification*), BACK-2-025 (dyslexia-friendly mode — *implemented, pending verification*), BACK-2-026 (de-emphasize trial banner — *implemented, pending verification*), BACK-2-027 (QR-code login + printable QR — *implemented, pending verification*), BACK-2-028 (mechanic checklist completion UX + confirmation — *implemented, pending verification*). Everything else complete — core loop,
+> **Status:** Fifteen open items — BACK-2-015 (mechanic dashboard cleanup + backup API gating — *implemented, pending verification*), BACK-2-016 (Start Job role logic + on-behalf start — *implemented, pending verification*), BACK-2-017 (ticket back-navigation — *implemented, pending verification*), BACK-2-018 (Appearance -> Settings — *implemented, pending verification*), BACK-2-019 (mobile one-row KPI strip — *implemented, pending verification*), BACK-2-020 (billing actions staff-only — *implemented, pending verification*), BACK-2-021 (case-insensitive usernames — *implemented, pending verification*), BACK-2-022 (slide-to-confirm on actions — *implemented, pending verification*), BACK-2-023 (assign staff-only — *implemented, pending verification*), BACK-2-024 (responsive estimate dialog — *implemented (estimate, discounts + inventory dialogs audited); pending verification*), BACK-2-025 (dyslexia-friendly mode — *implemented, pending verification*), BACK-2-026 (de-emphasize trial banner — *implemented, pending verification*), BACK-2-027 (QR-code login + printable QR — *implemented, pending verification*), BACK-2-028 (mechanic checklist completion UX + confirmation — *implemented, pending verification*), BACK-2-029 (Appearance: fix color swatches + dyslexia tint modes — **open**). Everything else complete — core loop,
 > asset detail/edit/soft-delete, lightweight bookings, photos + note threads, role-based Jobs views,
 > Start Job + timing, cancel, discounts. Completed items live in [`phase-2-completed.md`](./phase-2-completed.md).
 > **Scope:** Asset Management, Job Orders, Service History, Mechanic Views, Billing
@@ -529,5 +529,49 @@ Pick one and note it in BACK-2-022 so the two stay consistent.
       BACK-2-022 (and BACK-2-022 updated to match the decision)
 - [ ] "Mark as Done" still only enables when every task is complete
 - [ ] Clear visual done/undone state; no regression to the timing/completion flow
+
+---
+
+## BACK-2-029 · Appearance — Fix Color-Theme Swatches + Dyslexia-Friendly Tint Modes
+
+**Priority:** 🟡 Medium (visible cosmetic bug + accessibility enhancement)
+**Area:** `packages/ui/src/components/theme-switcher.tsx`, `packages/ui/src/components/theme-provider.tsx`,
+`packages/ui/src/styles.css` (theme token classes)
+**Origin:** Owner request 2026-07-08 (screenshot: all nine swatches render the same color).
+
+**Part 1 — Bug: color-theme swatches all show the selected color.**
+Root cause (confirmed in `theme-switcher.tsx:49-53`): each swatch's background is
+`hsl(var(--primary))` via a broken ternary (`c === "zinc" ? "primary" : "primary"` — both branches
+identical, marked "simplified preview"), so every circle paints with the *active* theme's primary
+instead of its own; and the inner dot uses runtime-composed Tailwind classes (`bg-${c}-500`) which
+the compiler can't see and purges — it renders invisible.
+**Fix:** a static preview-color map (theme key → fixed hex/HSL, e.g. zinc `#18181b`, red `#dc2626`,
+… brown) applied as an inline style, independent of the active theme. Selected state keeps the ring.
+
+**Part 2 — Mode: add "Tint Cream" and "Tint Blue" (dyslexia-friendly backgrounds).**
+Alongside Light | Dark, two tinted light modes: **Tint Cream** (warm off-white, e.g. ~`#faf5e6`
+family) and **Tint Blue** (soft pastel blue, e.g. ~`#eaf2fb` family). Cream/blue overlays reduce
+glare + visual stress for many dyslexic readers (Irlen-style tinting) — pairs with the
+OpenDyslexic toggle (BACK-2-C0xx / BACK-2-025).
+
+**Build notes / considerations:**
+- Mechanism: `next-themes` accepts arbitrary theme values — extend to
+  `['light','dark','cream','tint-blue']` with `.cream` / `.tint-blue` classes in `styles.css`
+  overriding the surface tokens (`--background`, `--card`, `--popover`, `--muted`; keep foregrounds
+  legible). They behave as light-mode variants; color themes (primary) must still work on top.
+- The `ThemeProvider … enableSystem` "system" resolution maps to light/dark only — tint modes are
+  explicit choices; decide how "system" interacts (likely: tints are simply two more manual options).
+- Persistence is per-device via next-themes localStorage (same as light/dark today).
+- Dyslexia toggle interplay: independent controls (a user may want the tint without the font and
+  vice versa); optionally hint the tints when the dyslexia toggle is on — decide at build.
+- Verify contrast of status badges/primary buttons on both tints (roles: mechanic checklist,
+  estimate dialog, KPI strip).
+
+**Acceptance Criteria:**
+- [ ] Each color-theme swatch shows its own color regardless of the selected theme; selected state clear
+- [ ] Mode row offers Light / Dark / Tint Cream / Tint Blue; selection persists across restarts
+- [ ] Tints restyle backgrounds app-wide with legible foregrounds/contrast (spot-check dense views)
+- [ ] Color themes (primary) still apply on top of either tint
+- [ ] Works for every role (Appearance is a personal section per BACK-2-015)
 
 ---
