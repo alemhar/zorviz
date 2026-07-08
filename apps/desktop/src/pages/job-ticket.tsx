@@ -18,6 +18,7 @@ import { DiscountsDialog } from "../features/repair/components/DiscountsDialog";
 import { useAppConfigStore } from "../stores/app-config";
 import { useAuthStore } from "../stores/auth";
 import { toast } from "../stores/toast";
+import { useSmartBack } from "../lib/use-smart-back";
 
 function assetTitle(asset?: JobTicket["asset"]): string {
     if (!asset) return "Unknown asset";
@@ -51,6 +52,7 @@ function duration(from: number, to: number): string {
 export default function JobTicketPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const goBack = useSmartBack("/jobs"); // deep-link fallback: the jobs list (My Jobs / Jobs by role)
     const config = useAppConfigStore((s) => s.config);
     const currency = config?.currency_symbol ?? "";
     const role = useAuthStore((s) => s.user?.role);
@@ -137,7 +139,7 @@ export default function JobTicketPage() {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
             <header className="px-4 py-3 bg-white dark:bg-slate-800 shadow-sm flex items-center gap-3">
-                <button onClick={() => navigate("/repair")} className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                <button onClick={goBack} className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h1 className="text-lg font-bold">Job Ticket</h1>

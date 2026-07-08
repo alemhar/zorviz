@@ -23,6 +23,7 @@ import { StatusBadge } from "../components/status-badge";
 import { AssetEditForm } from "../features/repair/components/AssetEditForm";
 import { useAppConfigStore } from "../stores/app-config";
 import { useAuthStore } from "../stores/auth";
+import { useSmartBack } from "../lib/use-smart-back";
 
 // A display label for the asset: first filled field (in the type's field order), else
 // the first non-empty spec value, else a generic label.
@@ -39,6 +40,7 @@ function assetTitle(a: AssetDetail, fields: FieldDef[]): string {
 export default function AssetDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const goBack = useSmartBack();
     const currency = useAppConfigStore((s) => s.config?.currency_symbol ?? "");
     // Mechanics may reach asset detail from a job ticket for service history, but can't
     // edit/delete the asset (BACK-2-015).
@@ -98,7 +100,7 @@ export default function AssetDetailPage() {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
             <header className="px-4 py-3 bg-white dark:bg-slate-800 shadow-sm flex items-center gap-3">
-                <button onClick={() => navigate(-1)} className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                <button onClick={goBack} className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h1 className="text-lg font-bold">Asset</h1>
