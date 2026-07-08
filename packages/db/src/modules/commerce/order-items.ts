@@ -12,6 +12,7 @@ export interface OrderItemsTable {
     total: number; // centavos
     inventory_item_id: Nullable<string>; // set when a part is picked from inventory
     completed: ColumnType<number, number | undefined, number>; // 1 = done by mechanic
+    cost_at_sale: Nullable<number>; // BACK-3-013: linked part's unit_cost frozen at estimate save
     created_at: number; // added 0020 (sync change-tracking)
     updated_at: number; // set on insert, bumped on the completed toggle
 }

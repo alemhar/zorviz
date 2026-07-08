@@ -6,7 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { formatMoney } from "@zorviz/core";
 import { ServerStatus } from "../components/server-status";
 import { CloudStatus } from "../components/cloud-status";
-import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp, DatabaseBackup, Users, CalendarDays } from "lucide-react";
+import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp, DatabaseBackup, Users, CalendarDays, Wallet } from "lucide-react";
+import { DrawerCard } from "../components/drawer-card";
 import { BackupDialog } from "../features/backup/BackupDialog";
 import { api } from "../lib/api";
 import { logoUrl } from "../lib/logo-api";
@@ -118,6 +119,15 @@ export default function DashboardPage() {
                 color: "from-emerald-500 to-emerald-600",
             }]
             : []),
+        ...(user?.role === "admin" || user?.role === "owner" || user?.role === "advisor"
+            ? [{
+                title: "Expenses",
+                description: "Money out — parts, salaries, bills",
+                icon: Wallet,
+                href: "/expenses",
+                color: "from-rose-500 to-rose-600",
+            }]
+            : []),
         {
             title: "Settings",
             description: "Shop profile, currency & tax",
@@ -213,14 +223,17 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Data (backup). Appearance/theme moved to Settings — BACK-2-018. */}
+                {/* Drawer + Data (staff). Appearance/theme moved to Settings — BACK-2-018. */}
                 {isStaff && (
-                    <div className="border rounded-xl p-6 bg-card max-w-sm">
-                        <h3 className="font-semibold mb-2">Data</h3>
-                        <p className="text-sm text-muted-foreground mb-4">Back up your shop's data or restore from a backup.</p>
-                        <Button variant="outline" onClick={() => setBackupOpen(true)}>
-                            <DatabaseBackup className="w-4 h-4 mr-2" /> Backup &amp; Restore
-                        </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                        <DrawerCard />
+                        <div className="border rounded-xl p-6 bg-card max-w-sm">
+                            <h3 className="font-semibold mb-2">Data</h3>
+                            <p className="text-sm text-muted-foreground mb-4">Back up your shop's data or restore from a backup.</p>
+                            <Button variant="outline" onClick={() => setBackupOpen(true)}>
+                                <DatabaseBackup className="w-4 h-4 mr-2" /> Backup &amp; Restore
+                            </Button>
+                        </div>
                     </div>
                 )}
             </main>

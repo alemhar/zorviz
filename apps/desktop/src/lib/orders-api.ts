@@ -49,19 +49,25 @@ export interface JobTicket {
     mechanic?: { id: string; name: string; role: string } | null;
     items?: OrderItem[];
     approval_proof?: { approved_by: string; method: string; at: number } | null;
-    payment?: {
-        method: string; // 'cash' | 'gcash' | 'card'
-        amount: number; // centavos
-        tendered: number; // centavos
-        change_due: number; // centavos
-        processed_by: string | null;
-        created_at: number;
-    } | null;
+    payment?: PaymentRecord | null; // latest (kept for the PDF)
+    payments?: PaymentRecord[]; // full history, oldest first (BACK-3-012)
+    paid_total?: number; // centavos received so far
+    balance_due?: number; // centavos outstanding (0 when settled)
+}
+
+export interface PaymentRecord {
+    method: string; // 'cash' | 'gcash' | 'card'
+    amount: number; // centavos — THIS payment's amount (full or partial)
+    tendered: number; // centavos
+    change_due: number; // centavos
+    processed_by: string | null;
+    created_at: number;
 }
 
 export interface PaymentInput {
     method: string; // 'cash' | 'gcash' | 'card'
     tendered: number; // centavos
+    amount?: number; // BACK-3-012: partial amount; omit to pay the full remaining balance
 }
 
 export interface JobSummary {

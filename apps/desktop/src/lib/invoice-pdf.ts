@@ -170,8 +170,14 @@ export async function generateInvoicePdf(
     totalRow(taxLabel, formatMoney(ticket.tax, currency));
     totalRow("Total", formatMoney(ticket.total, currency), true);
 
-    // BACK-3-007: payment method + change returned (when a payment was recorded).
-    if (ticket.payment) {
+    // BACK-3-007/012: payment lines. Partially paid → paid-to-date + balance due; settled →
+    // the latest payment's method + change.
+    const paidTotal = ticket.paid_total ?? 0;
+    const balanceDue = ticket.balance_due ?? Math.max(0, ticket.total - paidTotal);
+    if (paidTotal > 0 && balanceDue > 0) {
+        totalRow("Paid to date", formatMoney(paidTotal, currency));
+        totalRow("BALANCE DUE", formatMoney(balanceDue, currency), true);
+    } else if (ticket.payment) {
         const methodLabel =
             ticket.payment.method === "gcash" ? "GCash" : ticket.payment.method === "card" ? "Card" : "Cash";
         totalRow(`Paid via ${methodLabel}`, formatMoney(ticket.payment.tendered, currency));

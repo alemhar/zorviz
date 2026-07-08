@@ -29,37 +29,48 @@ interface Props {
     onPaid: (t: JobTicket) => void;
 }
 
-// BACK-3-007: record how a finished job was paid (method + tendered + change), then mark paid.
+// BACK-3-007/012: record a payment — full (default) or partial. A partial leaves the job `done`
+// with a balance due; it flips to `paid` when the balance reaches zero (server-authoritative).
 export function PaymentDialog({ ticket, open, onOpenChange, onPaid }: Props) {
     const currency = useAppConfigStore((s) => s.config?.currency_symbol ?? "");
     const confirm = useConfirm();
-    const total = ticket.total;
+    const balance = ticket.balance_due ?? ticket.total;
+    const partiallyPaid = (ticket.paid_total ?? 0) > 0;
 
+    const [mode, setMode] = useState<"full" | "partial">("full");
     const [method, setMethod] = useState<Method>("cash");
+    const [amountStr, setAmountStr] = useState("");
     const [tenderedStr, setTenderedStr] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
     useEffect(() => {
         if (open) {
+            setMode("full");
             setMethod("cash");
+            setAmountStr("");
             setTenderedStr("");
             setError("");
         }
     }, [open]);
 
+    // This payment's amount: the full balance, or the typed partial amount.
+    const amountC = mode === "full" ? balance : toCentavos(parseFloat(amountStr) || 0);
+    const overBalance = mode === "partial" && amountC > balance;
+    const amountInvalid = amountC <= 0 || overBalance;
     // Non-cash tenders are exact; cash uses the entered amount.
-    const tenderedC = method === "cash" ? toCentavos(parseFloat(tenderedStr) || 0) : total;
-    const changeC = Math.max(0, tenderedC - total);
-    const short = method === "cash" && tenderedC < total;
+    const tenderedC = method === "cash" ? toCentavos(parseFloat(tenderedStr) || 0) : amountC;
+    const changeC = Math.max(0, tenderedC - amountC);
+    const short = method === "cash" && tenderedC < amountC;
 
     const submit = async () => {
-        if (short) return;
-        if (!(await confirm({ title: "Record this payment?", verb: "Slide to record payment" }))) return;
+        if (short || amountInvalid) return;
+        const verb = mode === "partial" ? "Slide to record partial payment" : "Slide to record payment";
+        if (!(await confirm({ title: "Record this payment?", verb }))) return;
         setSaving(true);
         setError("");
         try {
-            const updated = await billOrder(ticket.id, { method, tendered: tenderedC });
+            const updated = await billOrder(ticket.id, { method, tendered: tenderedC, amount: amountC });
             onPaid(updated);
             onOpenChange(false);
         } catch (e) {
@@ -75,14 +86,56 @@ export function PaymentDialog({ ticket, open, onOpenChange, onPaid }: Props) {
             <DialogContent className="max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Payment</DialogTitle>
-                    <DialogDescription>Record how the customer paid, then mark the job paid.</DialogDescription>
+                    <DialogDescription>
+                        {partiallyPaid
+                            ? "Record another payment toward the remaining balance."
+                            : "Record how the customer paid."}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4">
                     <div className="flex items-baseline justify-between rounded-lg bg-muted/50 px-3 py-2">
-                        <span className="text-sm text-muted-foreground">Amount due</span>
-                        <span className="text-xl font-bold">{formatMoney(total, currency)}</span>
+                        <span className="text-sm text-muted-foreground">{partiallyPaid ? "Balance due" : "Amount due"}</span>
+                        <span className="text-xl font-bold">{formatMoney(balance, currency)}</span>
                     </div>
+
+                    <div className="space-y-1">
+                        <Label>Payment</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {([["full", "Full balance"], ["partial", "Partial"]] as const).map(([k, label]) => (
+                                <button
+                                    key={k}
+                                    type="button"
+                                    onClick={() => setMode(k)}
+                                    className={`rounded-md border p-2 text-sm font-medium transition-colors ${
+                                        mode === k ? "bg-primary/10 border-primary text-primary" : "hover:bg-muted"
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {mode === "partial" && (
+                        <div className="space-y-1">
+                            <Label htmlFor="payamount">Amount to pay now</Label>
+                            <Input
+                                id="payamount"
+                                value={amountStr}
+                                onChange={(e) => setAmountStr(e.target.value)}
+                                inputMode="decimal"
+                                placeholder="0.00"
+                                autoFocus
+                            />
+                            {overBalance && <p className="text-sm text-destructive">More than the remaining balance.</p>}
+                            {!overBalance && amountC > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    Remaining after this: {formatMoney(balance - amountC, currency)}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     <div className="space-y-1">
                         <Label>Method</Label>
@@ -111,7 +164,6 @@ export function PaymentDialog({ ticket, open, onOpenChange, onPaid }: Props) {
                                 onChange={(e) => setTenderedStr(e.target.value)}
                                 inputMode="decimal"
                                 placeholder="0.00"
-                                autoFocus
                             />
                             <div className="flex items-center justify-between pt-1 text-sm">
                                 <span className="text-muted-foreground">Change</span>
@@ -131,7 +183,7 @@ export function PaymentDialog({ ticket, open, onOpenChange, onPaid }: Props) {
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
-                    <Button onClick={submit} disabled={saving || short}>
+                    <Button onClick={submit} disabled={saving || short || amountInvalid}>
                         {saving ? "Recording…" : "Record Payment"}
                     </Button>
                 </DialogFooter>

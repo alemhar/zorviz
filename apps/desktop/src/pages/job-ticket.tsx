@@ -396,10 +396,24 @@ export default function JobTicketPage() {
                                     {ticket.receipt_number && (
                                         <div className="text-sm text-muted-foreground">Receipt {ticket.receipt_number}</div>
                                     )}
-                                    {ticket.payment && (
-                                        <div className="text-sm text-muted-foreground">
-                                            Paid via {ticket.payment.method === "gcash" ? "GCash" : ticket.payment.method === "card" ? "Card" : "Cash"}
-                                            {ticket.payment.change_due > 0 ? ` · change ${formatMoney(ticket.payment.change_due, currency)}` : ""}
+                                    {ticket.payments && ticket.payments.length > 0 && (
+                                        <div className="space-y-1 text-sm">
+                                            {ticket.payments.map((p, i) => (
+                                                <div key={i} className="flex justify-between text-muted-foreground">
+                                                    <span>
+                                                        {p.method === "gcash" ? "GCash" : p.method === "card" ? "Card" : "Cash"}
+                                                        {" · "}{new Date(p.created_at).toLocaleDateString()}
+                                                        {p.change_due > 0 ? ` · change ${formatMoney(p.change_due, currency)}` : ""}
+                                                    </span>
+                                                    <span>{formatMoney(p.amount, currency)}</span>
+                                                </div>
+                                            ))}
+                                            {(ticket.balance_due ?? 0) > 0 && (
+                                                <div className="flex justify-between font-semibold text-destructive">
+                                                    <span>Balance due</span>
+                                                    <span>{formatMoney(ticket.balance_due ?? 0, currency)}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                     {ticket.started_at && ticket.completed_at && (
@@ -422,7 +436,7 @@ export default function JobTicketPage() {
                                         )}
                                         {ticket.status === "done" && (
                                             <Button className="flex-1" onClick={() => setPaymentOpen(true)}>
-                                                Mark as Paid
+                                                {(ticket.paid_total ?? 0) > 0 ? "Record Payment" : "Mark as Paid"}
                                             </Button>
                                         )}
                                     </div>

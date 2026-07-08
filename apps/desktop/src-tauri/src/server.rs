@@ -19,6 +19,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use crate::api_data;
 use crate::asset_types;
 use crate::bookings;
+use crate::financials;
 use crate::inventory;
 use crate::media;
 use crate::auth::{self, ApiState, AuthState};
@@ -177,6 +178,14 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
         .route("/api/backup-dir", post(api_data::set_backup_dir))
         .route("/api/sync/changes", get(api_data::sync_changes))
         .route("/api/sync/watermark", post(api_data::set_watermark))
+        .route(
+            "/api/expenses",
+            get(financials::list_expenses).post(financials::create_expense),
+        )
+        .route("/api/expenses/:id/void", post(financials::void_expense))
+        .route("/api/drawer", get(financials::drawer_status))
+        .route("/api/drawer/open", post(financials::open_drawer))
+        .route("/api/drawer/close", post(financials::close_drawer))
         .route(
             "/api/inventory",
             get(api_data::search_inventory).post(api_data::create_inventory),

@@ -19,6 +19,7 @@ import UsersPage from "./pages/users";
 import SettingsPage from "./pages/settings";
 import BookingsPage from "./pages/bookings";
 import InventoryPage from "./pages/inventory";
+import ExpensesPage from "./pages/expenses";
 import "@zorviz/ui/src/styles.css";
 import "./dyslexia.css";
 import "./stores/dyslexia"; // applies the persisted .dyslexic class at startup
@@ -90,6 +91,10 @@ function App() {
                 <Route
                   path="/inventory"
                   element={isAuthenticated ? <InventoryPage /> : <Navigate to="/login" />}
+                />
+                <Route
+                  path="/expenses"
+                  element={isAuthenticated ? <ExpensesPage /> : <Navigate to="/login" />}
                 />
                 <Route path="*" element={<Navigate to="/" />} />
               </>

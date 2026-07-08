@@ -437,9 +437,7 @@ pub async fn create_order(
     headers: HeaderMap,
     Json(req): Json<CreateOrderReq>,
 ) -> Result<Json<Value>, StatusCode> {
-    if session_from_headers(&state, &headers).is_none() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    let session = session_from_headers(&state, &headers).ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Derive customer from the asset's owner.
     let customer_id: Option<String> = sqlx::query("SELECT owner_id FROM assets WHERE id = ? LIMIT 1")
@@ -458,8 +456,8 @@ pub async fn create_order(
 
     sqlx::query(
         "INSERT INTO orders (id, asset_id, customer_id, status, customer_complaint, inspection, \
-         job_order_no, terms, subtotal, tax, discount, total, created_at, updated_at) \
-         VALUES (?, ?, ?, 'triage', ?, ?, ?, ?, 0, 0, 0, 0, ?, ?)",
+         job_order_no, terms, subtotal, tax, discount, total, created_by, created_at, updated_at) \
+         VALUES (?, ?, ?, 'triage', ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&req.asset_id)
@@ -468,6 +466,7 @@ pub async fn create_order(
     .bind(&inspection_str)
     .bind(nz(&req.job_order_no))
     .bind(nz(&req.terms))
+    .bind(&session.name) // BACK-3-013: who did intake
     .bind(now)
     .bind(now)
     .execute(&state.pool)
@@ -623,16 +622,27 @@ async fn order_detail(state: &ApiState, id: &str) -> Option<Value> {
         .unwrap_or_default();
     obj.insert("items".to_string(), Value::Array(items));
 
-    // BACK-3-007: the recorded payment (latest), if the job was billed with one.
-    if let Ok(Some(prow)) = sqlx::query(
+    // BACK-3-007/012: payment history + paid/balance rollup (multiple payments per order).
+    if let Ok(prows) = sqlx::query(
         "SELECT method, amount, tendered, change_due, processed_by, created_at \
-         FROM payments WHERE order_id = ? ORDER BY created_at DESC LIMIT 1",
+         FROM payments WHERE order_id = ? ORDER BY created_at ASC",
     )
     .bind(id)
-    .fetch_optional(&state.pool)
+    .fetch_all(&state.pool)
     .await
     {
-        obj.insert("payment".to_string(), Value::Object(row_to_json(&prow)));
+        let paid_total: i64 = prows
+            .iter()
+            .map(|r| r.try_get::<i64, _>("amount").unwrap_or(0))
+            .sum();
+        let total = obj.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
+        if let Some(last) = prows.last() {
+            obj.insert("payment".to_string(), Value::Object(row_to_json(last))); // latest (PDF)
+        }
+        let arr: Vec<Value> = prows.iter().map(|r| Value::Object(row_to_json(r))).collect();
+        obj.insert("payments".to_string(), Value::Array(arr));
+        obj.insert("paid_total".to_string(), Value::from(paid_total));
+        obj.insert("balance_due".to_string(), Value::from((total - paid_total).max(0)));
     }
 
     Some(Value::Object(obj))
@@ -808,10 +818,21 @@ pub async fn save_estimate(
         let total = (item.quantity * item.unit_price as f64).round() as i64;
         subtotal += total;
         let unit = item.unit.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        // BACK-3-013: freeze the linked part's current unit_cost so gross margin is immune
+        // to later inventory cost edits. NULL for services / unlinked lines.
+        let cost_at_sale: Option<i64> = match &item.inventory_item_id {
+            Some(inv_id) => sqlx::query_scalar("SELECT unit_cost FROM inventory WHERE id = ? LIMIT 1")
+                .bind(inv_id)
+                .fetch_optional(&state.pool)
+                .await
+                .ok()
+                .flatten(),
+            None => None,
+        };
         let now = now_ms();
         sqlx::query(
-            "INSERT INTO order_items (id, order_id, type, description, quantity, unit, unit_price, total, inventory_item_id, created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO order_items (id, order_id, type, description, quantity, unit, unit_price, total, inventory_item_id, cost_at_sale, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(uuid::Uuid::new_v4().to_string())
         .bind(&id)
@@ -822,6 +843,7 @@ pub async fn save_estimate(
         .bind(item.unit_price)
         .bind(total)
         .bind(&item.inventory_item_id)
+        .bind(cost_at_sale)
         .bind(now)
         .bind(now)
         .execute(&state.pool)
@@ -891,9 +913,10 @@ pub async fn set_discounts(
     let (_net, tax, senior_discount, total) = compute_totals(subtotal, req.discount, stype.is_some(), rate, false);
     let nz = |o: &Option<String>| o.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
 
+    let actor = session_from_headers(&state, &headers).map(|s| s.name);
     sqlx::query(
         "UPDATE orders SET discount = ?, senior_discount = ?, senior_pwd_type = ?, senior_pwd_id = ?, \
-         senior_pwd_name = ?, tax = ?, total = ?, updated_at = ? WHERE id = ?",
+         senior_pwd_name = ?, tax = ?, total = ?, discounted_by = ?, updated_at = ? WHERE id = ?",
     )
     .bind(req.discount)
     .bind(senior_discount)
@@ -902,6 +925,7 @@ pub async fn set_discounts(
     .bind(nz(&req.senior_pwd_name))
     .bind(tax)
     .bind(total)
+    .bind(&actor) // BACK-3-013
     .bind(now_ms())
     .bind(&id)
     .execute(&state.pool)
@@ -1571,6 +1595,7 @@ pub async fn cancel_order(
     Json(req): Json<CancelReq>,
 ) -> Result<Json<Value>, (StatusCode, String)> {
     require_staff(&state, &headers).map_err(|s| (s, "staff only".to_string()))?;
+    let actor = session_from_headers(&state, &headers).map(|s| s.name);
     let status: Option<String> = sqlx::query_scalar("SELECT status FROM orders WHERE id = ? LIMIT 1")
         .bind(&id)
         .fetch_optional(&state.pool)
@@ -1589,8 +1614,9 @@ pub async fn cancel_order(
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .ok_or((StatusCode::BAD_REQUEST, "a cancellation reason is required".to_string()))?;
-    sqlx::query("UPDATE orders SET status = 'cancelled', cancel_reason = ?, updated_at = ? WHERE id = ?")
+    sqlx::query("UPDATE orders SET status = 'cancelled', cancel_reason = ?, cancelled_by = ?, updated_at = ? WHERE id = ?")
         .bind(&reason)
+        .bind(&actor) // BACK-3-013
         .bind(now_ms())
         .bind(&id)
         .execute(&state.pool)
@@ -1666,27 +1692,62 @@ pub async fn start_order(
 #[serde(default)]
 pub struct BillReq {
     method: Option<String>, // 'cash' | 'gcash' | 'card' (BACK-3-007)
-    tendered: Option<i64>, // centavos handed over (cash); defaults to the total
+    tendered: Option<i64>, // centavos handed over (cash); defaults to this payment's amount
+    amount: Option<i64>, // BACK-3-012: this payment's amount; defaults to the remaining balance
 }
 
-/// POST /api/orders/:id/bill — assign a receipt number (once), record the payment (BACK-3-007),
-/// and mark `paid`. Auth required; staff only.
+/// POST /api/orders/:id/bill — record a payment (full or partial, BACK-3-007/012). The receipt
+/// number is assigned on the first payment; the order flips to `paid` only once the balance
+/// reaches zero (a partially-paid job stays `done` with a balance due). Staff only.
 pub async fn bill_order(
     State(state): State<ApiState>,
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(req): Json<BillReq>,
-) -> Result<Json<Value>, StatusCode> {
-    require_staff(&state, &headers)?; // BACK-2-020: billing is front-desk work (mechanic → 403)
-    // Only a finished job can be billed ('paid' allowed again — re-billing is idempotent
-    // and reuses the receipt number).
+) -> Result<Json<Value>, (StatusCode, String)> {
+    require_staff(&state, &headers).map_err(|s| (s, "staff only".to_string()))?; // BACK-2-020
     match order_status(&state, &id).await.as_deref() {
-        None => return Err(StatusCode::NOT_FOUND),
+        None => return Err((StatusCode::NOT_FOUND, "order not found".to_string())),
         Some("done") | Some("paid") => {}
-        _ => return Err(StatusCode::CONFLICT),
+        _ => return Err((StatusCode::CONFLICT, "Only a finished job can be billed.".to_string())),
     }
 
-    // Reuse an existing receipt number if this order was already billed.
+    let method = req
+        .method
+        .as_ref()
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .ok_or((StatusCode::BAD_REQUEST, "a payment method is required".to_string()))?;
+
+    let ise = |_e| (StatusCode::INTERNAL_SERVER_ERROR, "billing failed".to_string());
+    let total: i64 = sqlx::query_scalar("SELECT total FROM orders WHERE id = ? LIMIT 1")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(ise)?
+        .unwrap_or(0);
+    let paid_so_far: i64 = sqlx::query_scalar("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE order_id = ?")
+        .bind(&id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(ise)?;
+    let balance = total - paid_so_far;
+    if balance <= 0 {
+        return Err((StatusCode::CONFLICT, "This job is already fully paid.".to_string()));
+    }
+
+    // This payment: defaults to the full remaining balance; a partial must not overpay it.
+    let amount = req.amount.unwrap_or(balance);
+    if amount <= 0 {
+        return Err((StatusCode::BAD_REQUEST, "the payment amount must be greater than zero".to_string()));
+    }
+    if amount > balance {
+        return Err((StatusCode::BAD_REQUEST, "the payment exceeds the remaining balance".to_string()));
+    }
+    let tendered = req.tendered.unwrap_or(amount);
+    let change_due = (tendered - amount).max(0);
+
+    // Receipt number is assigned once, at the first payment.
     let existing: Option<String> = sqlx::query("SELECT receipt_number FROM orders WHERE id = ? LIMIT 1")
         .bind(&id)
         .fetch_optional(&state.pool)
@@ -1695,7 +1756,6 @@ pub async fn bill_order(
         .flatten()
         .and_then(|r| r.try_get::<Option<String>, _>("receipt_number").ok())
         .flatten();
-
     let receipt = match existing {
         Some(r) => r,
         None => {
@@ -1710,54 +1770,35 @@ pub async fn bill_order(
     };
 
     let now = now_ms();
-    sqlx::query("UPDATE orders SET receipt_number = ?, status = 'paid', updated_at = ? WHERE id = ?")
+    let processed_by = session_from_headers(&state, &headers).map(|s| s.name);
+    sqlx::query(
+        "INSERT INTO payments (id, order_id, method, amount, tendered, change_due, processed_by, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(&id)
+    .bind(&method)
+    .bind(amount)
+    .bind(tendered)
+    .bind(change_due)
+    .bind(&processed_by)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .map_err(ise)?;
+
+    // Settled → paid; otherwise the job stays `done` and shows its balance due.
+    let settled = paid_so_far + amount >= total;
+    sqlx::query("UPDATE orders SET receipt_number = ?, status = CASE WHEN ? THEN 'paid' ELSE status END, updated_at = ? WHERE id = ?")
         .bind(&receipt)
+        .bind(settled)
         .bind(now)
         .bind(&id)
         .execute(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(ise)?;
 
-    // Record the payment (BACK-3-007) when a method is given and none is recorded yet — keeps
-    // re-billing idempotent. amount = order total; change = tendered − total (clamped ≥ 0).
-    if let Some(method) = req.method.as_ref().map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()) {
-        let already: i64 = sqlx::query("SELECT COUNT(*) AS c FROM payments WHERE order_id = ?")
-            .bind(&id)
-            .fetch_one(&state.pool)
-            .await
-            .ok()
-            .and_then(|r| r.try_get::<i64, _>("c").ok())
-            .unwrap_or(0);
-        if already == 0 {
-            let total: i64 = sqlx::query("SELECT total FROM orders WHERE id = ? LIMIT 1")
-                .bind(&id)
-                .fetch_optional(&state.pool)
-                .await
-                .ok()
-                .flatten()
-                .and_then(|r| r.try_get::<i64, _>("total").ok())
-                .unwrap_or(0);
-            let tendered = req.tendered.unwrap_or(total);
-            let change_due = (tendered - total).max(0);
-            let processed_by = session_from_headers(&state, &headers).map(|s| s.name);
-            let _ = sqlx::query(
-                "INSERT INTO payments (id, order_id, method, amount, tendered, change_due, processed_by, created_at) \
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(uuid::Uuid::new_v4().to_string())
-            .bind(&id)
-            .bind(&method)
-            .bind(total)
-            .bind(tendered)
-            .bind(change_due)
-            .bind(&processed_by)
-            .bind(now)
-            .execute(&state.pool)
-            .await;
-        }
-    }
-
-    order_detail(&state, &id).await.ok_or(StatusCode::NOT_FOUND).map(Json)
+    order_detail(&state, &id).await.ok_or((StatusCode::NOT_FOUND, "not found".to_string())).map(Json)
 }
 
 // ---- Cloud sync (BACK-4 prep; see docs/cloud-sync-protocol.md) ----
@@ -1779,7 +1820,7 @@ pub async fn sync_changes(
     let since = q.since.unwrap_or(0);
     let tenant = tenant_id(&state).await;
     // (table, change-marker column) — must match docs/cloud-sync-protocol.md §5.
-    let specs: [(&str, &str); 9] = [
+    let specs: [(&str, &str); 11] = [
         ("customers", "updated_at"),
         ("assets", "updated_at"),
         ("asset_types", "updated_at"),
@@ -1789,6 +1830,8 @@ pub async fn sync_changes(
         ("inventory", "updated_at"),
         ("inventory_adjustments", "created_at"),
         ("payments", "created_at"),
+        ("expenses", "updated_at"),        // BACK-3-010 (soft-void bumps updated_at)
+        ("drawer_sessions", "updated_at"), // BACK-3-011 (close bumps updated_at)
     ];
     let mut tables = serde_json::Map::new();
     let mut count = 0usize;

@@ -114,3 +114,47 @@ Add a Settings toggle for how the tax rate is applied to line prices:
 - [ ] Server (`compute_totals`) is the single source of the math; client previews match it exactly
 
 ---
+
+## BACK-3-010 · Expenses Log · *implemented, pending verification*
+
+**Priority:** 🔴 High (unlocks the profit picture — key cloud-subscription driver)
+**Origin:** Owner-approved financial audit, 2026-07-08.
+Money-out tracking: amount, category (parts/salary/utilities/rent/misc), note, paid-from-drawer
+flag, author. Staff can record; immutable log with soft **void** (admin) instead of delete (sync
+has no hard deletes). Feeds cloud P&L (revenue − expenses) and the drawer reconciliation.
+
+---
+
+## BACK-3-011 · Cash Drawer Sessions (Open/Close Day) · *implemented, pending verification*
+
+**Priority:** 🔴 High (leakage/theft visibility — THE absentee-owner feature)
+**Origin:** Owner-approved financial audit, 2026-07-08.
+Manual drawer card on the staff dashboard (no nagging prompts): **Open day** records the float;
+**Close day** computes expected cash = float + cash payments − drawer-paid expenses (session-based,
+opened_at→close), staff enters counted cash, system records **over/short**. One open session at a
+time; skipped days simply show unreconciled.
+
+---
+
+## BACK-3-012 · Partial Payments & Receivables · *implemented, pending verification*
+
+**Priority:** 🔴 High ("who owes me?" — utang/balance tracking)
+**Origin:** Owner-approved financial audit, 2026-07-08.
+Multiple payments per order: PaymentDialog gains Full/Partial; `payments.amount` becomes the
+per-payment amount; change = tendered − amount. Receipt number assigned at first payment; status
+flips to `paid` only when the balance reaches zero (a `done` ticket shows "Balance due"). Billing
+card lists payment history + Record payment; overpaying the balance is rejected. Invoice PDF shows
+paid-to-date + balance when partially paid.
+
+---
+
+## BACK-3-013 · COGS Snapshot + Action Attribution · *implemented, pending verification*
+
+**Priority:** 🟡 Medium (true margins + leakage attribution)
+**Origin:** Owner-approved financial audit, 2026-07-08.
+`order_items.cost_at_sale` snapshots the linked part's `unit_cost` when the estimate is saved
+(true gross margin, immune to later cost edits). Attribution stamps (actor name, matching the
+photos/payments pattern): `orders.created_by` (intake), `orders.cancelled_by`, `orders.discounted_by`.
+All invisible — no UI input added. (Comeback/warranty flag deliberately deferred.)
+
+---

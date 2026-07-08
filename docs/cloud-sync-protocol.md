@@ -63,7 +63,9 @@ Request:
     "order_items": [ … ],
     "inventory":   [ … ],
     "inventory_adjustments": [ … ],
-    "payments":    [ … ]
+    "payments":    [ … ],
+    "expenses":        [ … ],
+    "drawer_sessions": [ … ]
   }
 }
 ```
@@ -104,6 +106,11 @@ Reserved for multi-device / portal write-back. Shape TBD when we build bidirecti
   - `order_items` — **no timestamps**; add `created_at` + `updated_at`, set on insert (estimate save
     re-creates them) and bumped on the `completed` toggle.
   - Append-only, `created_at` is the marker (no change needed): `payments`, `inventory_adjustments`.
+  - **Added 2026-07-08 (BACK-3-010..013, still protocol v1 — additive):** `expenses` and
+    `drawer_sessions` sync with `updated_at` markers (soft-void / close bump them);
+    `order_items` gains `cost_at_sale`; `orders` gains `created_by`/`cancelled_by`/`discounted_by`;
+    `payments.amount` is now the **per-payment** amount (multiple payments per order — partials);
+    upsert-by-id semantics unchanged.
   - Already have `updated_at` (no change): `orders`, `customers`, `assets`, `asset_types`, `bookings`.
   - `app_config` gains `last_synced_at` (the client watermark).
 

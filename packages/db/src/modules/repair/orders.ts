@@ -35,6 +35,9 @@ export interface OrdersTable {
     started_at: Nullable<number>; // when work started (approved → in_progress)
     completed_at: Nullable<number>; // when marked done
     cancel_reason: Nullable<string>; // set when status = 'cancelled'
+    created_by: Nullable<string>; // BACK-3-013: who did intake
+    cancelled_by: Nullable<string>; // BACK-3-013: who cancelled
+    discounted_by: Nullable<string>; // BACK-3-013: who last set discounts
     created_at: number;
     updated_at: number;
 }
