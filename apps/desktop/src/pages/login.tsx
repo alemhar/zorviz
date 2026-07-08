@@ -6,6 +6,9 @@ import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, Car
 import { Wrench } from "lucide-react";
 import { logoUrl } from "../lib/logo-api";
 import { PinInput } from "../components/pin-input";
+import { LanQr } from "../components/lan-qr";
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export default function LoginPage() {
     const navigate = useNavigate();
@@ -41,7 +44,7 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background p-4">
             <Card className="w-full max-w-md">
                 <CardHeader className="space-y-1">
                     <div className="flex justify-center mb-4">
@@ -92,6 +95,20 @@ export default function LoginPage() {
                     </CardFooter>
                 </form>
             </Card>
+
+            {isTauri && (
+                <details className="w-full max-w-md rounded-lg border bg-card p-3 text-sm">
+                    <summary className="cursor-pointer text-muted-foreground select-none">
+                        Connect a phone to this shop
+                    </summary>
+                    <div className="pt-4">
+                        <p className="mb-3 text-center text-xs text-muted-foreground">
+                            Scan with your phone's camera to open the shop on your device.
+                        </p>
+                        <LanQr />
+                    </div>
+                </details>
+            )}
         </div>
     );
 }

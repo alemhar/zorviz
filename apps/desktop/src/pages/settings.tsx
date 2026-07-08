@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardContent, ThemeSwitcher } from "@zorviz/ui";
-import { ArrowLeft, Store, Coins, Monitor, ListPlus, Plus, Trash2, Image as ImageIcon, FileText, Palette } from "lucide-react";
+import { ArrowLeft, Store, Coins, Monitor, ListPlus, Plus, Trash2, Image as ImageIcon, FileText, Palette, QrCode } from "lucide-react";
+import { LanQr } from "../components/lan-qr";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
 import { useDyslexiaStore } from "../stores/dyslexia";
@@ -280,6 +281,20 @@ export default function SettingsPage() {
                 </Card>
 
                 {!isMechanic && (<>
+                <Card>
+                    <CardHeader className="flex-row items-center gap-2 space-y-0">
+                        <QrCode className="w-5 h-5 text-primary" />
+                        <CardTitle className="text-base">Connect a Phone</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                            Staff on phones scan this to open the shop over your local network. The address can
+                            change over time — re-scan or reprint if a device can't connect.
+                        </p>
+                        <LanQr showDownload />
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader className="flex-row items-center gap-2 space-y-0">
                         <ImageIcon className="w-5 h-5 text-primary" />
