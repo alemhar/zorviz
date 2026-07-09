@@ -183,7 +183,7 @@ export default function DashboardPage() {
                     {config?.logo_path && (
                         <img src={logoUrl(config.updated_at)} alt="" className="h-8 max-w-[120px] object-contain" />
                     )}
-                    <h1 className="font-bold text-xl bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">{config?.shop_name || "Zorviz"}</h1>
+                    <h1 className="font-bold text-xl bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">{config?.shop_name || "Wurkz Shop"}</h1>
                     <ServerStatus />
                     <CloudStatus />
                 </div>

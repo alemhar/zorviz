@@ -69,7 +69,7 @@ export default function LoginPage() {
                             </div>
                         )}
                     </div>
-                    <CardTitle className="text-2xl text-center">{shopName || "Zorviz"}</CardTitle>
+                    <CardTitle className="text-2xl text-center">{shopName || "Wurkz Shop"}</CardTitle>
                     <CardDescription className="text-center">
                         Sign in with your username and PIN
                     </CardDescription>

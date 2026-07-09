@@ -13,7 +13,7 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 // (the desktop's IP changes over time). Fetches the live URL on mount so it never goes stale.
 // Optional printable PDF (decision D9: download, the shop prints it).
 export function LanQr({ showDownload = false, size = 176 }: { showDownload?: boolean; size?: number }) {
-    const shopName = useAppConfigStore((s) => s.config?.shop_name ?? "Zorviz");
+    const shopName = useAppConfigStore((s) => s.config?.shop_name ?? "Wurkz Shop");
     const [url, setUrl] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 

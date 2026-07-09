@@ -27,7 +27,7 @@ class ReportPdf {
         const d = this.doc;
         d.setFont(PDF_FONT_FAMILY, "bold");
         d.setFontSize(16);
-        d.text(config?.shop_name ?? "Zorviz", LEFT, this.y);
+        d.text(config?.shop_name ?? "Wurkz Shop", LEFT, this.y);
         d.setFontSize(13);
         d.text(title.toUpperCase(), RIGHT, this.y, { align: "right" });
         this.y += 5.5;

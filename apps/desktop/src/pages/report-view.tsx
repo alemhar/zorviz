@@ -492,7 +492,7 @@ export default function ReportViewPage() {
 
                 <div className="border rounded-xl bg-card p-4 sm:p-6 space-y-4">
                     <div className="flex items-baseline justify-between gap-3 border-b pb-2">
-                        <div className="font-semibold">{config?.shop_name || "Zorviz"}</div>
+                        <div className="font-semibold">{config?.shop_name || "Wurkz Shop"}</div>
                         <div className="text-xs text-muted-foreground">{periodLabel()}</div>
                     </div>
                     {loading || !report ? (

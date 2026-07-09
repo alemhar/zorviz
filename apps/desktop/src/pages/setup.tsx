@@ -139,7 +139,7 @@ export default function SetupPage() {
                             <StepIcon className="w-7 h-7 text-primary" />
                         </div>
                     </div>
-                    <CardTitle className="text-2xl text-center">Welcome to Zorviz</CardTitle>
+                    <CardTitle className="text-2xl text-center">Welcome to Wurkz Shop</CardTitle>
                     <CardDescription className="text-center">
                         Step {step + 1} of {STEPS.length} — {STEPS[step].title}
                     </CardDescription>
