@@ -126,7 +126,7 @@ class ReportPdf {
 const fmtDT = (ms: number) =>
     new Date(ms).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const fmtD = (ms: number) => new Date(ms).toLocaleDateString();
-const methodLabel = (m: string) => (m === "gcash" ? "GCash" : m === "card" ? "Card" : "Cash");
+export const methodLabel = (m: string) => (m === "gcash" ? "GCash" : m === "card" ? "Card" : "Cash");
 
 /** 1. End-of-Day (Z-reading) report for the last closed drawer session. */
 export function eodReportPdf(data: EodReport, config: AppConfig | null, generatedBy: string | null): string {

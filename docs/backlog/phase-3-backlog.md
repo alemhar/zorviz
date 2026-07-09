@@ -234,6 +234,9 @@ productivity (jobs + wrench time; commission/payroll input), payables report.
 (pro-rata VAT/COGS/discounts per decision B), `senior_pwd_report`, `mechanic_report`; payables
 reuses `listPayables`. All five E2E-verified via Playwright download capture — P&L, VAT set-aside
 (₱107.14 pro-rata on ₱1,000 partial), Senior/PWD empty-state, mechanic wrench time, ₱450 payable.
+*2026-07-09 follow-up:* on-screen read-only HTML previews — report cards now navigate to `/reports/:key`
+pages (same endpoint payload as the PDF so numbers can't drift; period picker on the page; PDF is
+the export button). Payables page hides the period picker (as-of-now report).
 
 **Tier 3 — later:** vehicle service-history printout, sales-by-period detail, stock-movement log,
 gate pass / release slip.

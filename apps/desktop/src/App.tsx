@@ -21,6 +21,7 @@ import BookingsPage from "./pages/bookings";
 import InventoryPage from "./pages/inventory";
 import ExpensesPage from "./pages/expenses";
 import ReportsPage from "./pages/reports";
+import ReportViewPage from "./pages/report-view";
 import "@zorviz/ui/src/styles.css";
 import "./dyslexia.css";
 import "./stores/dyslexia"; // applies the persisted .dyslexic class at startup
@@ -105,6 +106,10 @@ function App() {
                 <Route
                   path="/reports"
                   element={isAuthenticated ? <ReportsPage /> : <Navigate to="/login" />}
+                />
+                <Route
+                  path="/reports/:key"
+                  element={isAuthenticated ? <ReportViewPage /> : <Navigate to="/login" />}
                 />
                 <Route path="*" element={<Navigate to="/" />} />
               </>
