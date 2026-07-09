@@ -48,19 +48,8 @@
 
 > Minimal flat vector logo mark, no text: a single bold checkmark whose tail sweeps forward into a subtle motion streak, suggesting speed and completion. Chunky geometric solid shapes, no outlines, no gradients, no 3D. Industrial safety orange (#F97316), free-floating on a plain white background, no badge or container. Dependable and energetic — "done, and done fast." Clean silhouette readable at 32 pixels.
 
+*Fix-up if the two checks don't fuse:* "the two checkmarks share strokes and merge into one continuous zigzag form."
 *Wordmark pairing:* heavy rounded sans (e.g. Nunito Black / app font at 800) in #1F2937, typed as real text.
-
-**Owner feedback:** no interlocking/gear-teeth/fused forms (disliked from round 1). Revised prompts:
-
-**Revised hero (one continuous smooth zigzag — W ending in a check tail):**
-
-> Minimal flat vector logo mark, no text: one single continuous bold zigzag stroke that reads as a smooth letter W, its final upstroke finishing like the tail of a checkmark. One uninterrupted flowing line with rounded corners and uniform thickness — a single clean shape, not multiple pieces joined together. Flat solid color, no outlines, no gradients, no 3D. Industrial safety orange (#F97316), free-floating on a plain white background, no badge or container. Feeling: dependable, smooth, effortless — "it just works." Simple silhouette readable at 32 pixels.
-
-**Alternative (pure single check, rounded, slight forward motion):**
-
-> Minimal flat vector logo mark, no text: a single bold checkmark with softly rounded corners, its tail sweeping slightly forward to suggest momentum. One clean solid shape only. Flat vector, no outlines, no gradients, no 3D. Industrial safety orange (#F97316), free-floating on a plain white background. Confident and calm — a quality mark, "done." Instantly readable at 32 pixels.
-
-**Negative guidance (append to either):** Do not use gears, gear teeth, interlocking parts, overlapping shapes, or mechanical texture. The mark is one smooth, simple form.
 
 ## When a winner is picked
 
