@@ -1,0 +1,38 @@
+# Wurkz Logo Brief (decisions + generation prompts)
+
+> Owner decisions 2026-07-09. Companion to [`positioning.md`](./positioning.md).
+
+## Decisions
+
+| Concern | Decision | Why |
+|---|---|---|
+| Form | **Icon + wordmark** | Icon alone = app/tab icon; full lockup = installer, receipts, cloud header |
+| Personality | **Dependable & solid** | Matches the "it just works" promise; tool-like, not startup-like |
+| Color | **Industrial orange (#F97316) + dark steel (#1F2937)** | Workshop energy; distinct from every-POS blue. Becomes the app accent eventually |
+| Motif | **Abstract gear-tooth W** (not a literal wrench/gear) | Ownable, ages well if Wurkz expands beyond repair shops |
+
+## Generation prompts (nano banana)
+
+**Full lockup:**
+
+> Professional logo design for "Wurkz", a repair shop management software. A bold abstract letter W built from interlocking gear teeth — the W's peaks shaped like the teeth of a gear, geometric and chunky, suggesting machinery without being a literal gear. Flat vector style, solid shapes, no gradients, no 3D effects. Color palette: industrial safety orange (#F97316) for the W mark, dark charcoal steel (#1F2937) for the wordmark "Wurkz" set in a heavy, rounded industrial sans-serif to the right of the mark. Clean white background, generous spacing, centered composition. The design should feel dependable, sturdy and honest — like a well-made tool, not a tech startup. Minimal, memorable, readable at small sizes.
+
+**Icon only (app icon / favicon):**
+
+> Minimal flat vector app icon: a bold abstract letter W formed by interlocking gear teeth, geometric and chunky, industrial safety orange (#F97316) on a dark charcoal (#1F2937) rounded-square background. No text, no gradients, no 3D, no outlines. Strong silhouette that stays recognizable at 32 pixels. Sturdy, mechanical, dependable feeling.
+
+**Dark-mode lockup variant:** wordmark in off-white (#F9FAFB) on dark charcoal (#1F2937), W stays safety orange.
+
+## Workflow tips
+
+1. Generate the **icon first**; once a W shape wins, feed the image back with "keep this exact W mark, add the wordmark" (editing is more consistent than regenerating).
+2. Always say **"flat vector style"** — otherwise it drifts to shiny 3D that dies at small sizes/print.
+3. Too gear-literal? Add: *"the gear teeth are part of the W's own strokes, not a gear surrounding it."*
+4. Reject any output with mangled "Wurkz" spelling — the most common AI-logo tell.
+
+## When a winner is picked
+
+- [ ] Replace Tauri icons (`src-tauri/icons/`) — needs 32/128/256 px + .ico/.icns
+- [ ] Desktop login/header logo (Settings already supports a shop logo — this is the *product* logo, separate)
+- [ ] Cloud header brand mark
+- [ ] Consider adopting #F97316 as the app accent (new theme decision — discuss first)
