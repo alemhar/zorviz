@@ -1,0 +1,7 @@
+/* Brand wordmark: locked to Nunito Black (rounded heavy sans, matches the Wurkz logo).
+   Applies ONLY to the literal "Wurkz" brand text — never to app UI or shop content. */
+.brand-wurkz {
+    font-family: "Nunito", ui-rounded, "Segoe UI", system-ui, sans-serif;
+    font-weight: 900;
+    letter-spacing: 0.01em;
+}

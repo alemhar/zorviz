@@ -27,6 +27,8 @@ import CustomerDetailPage from "./pages/customer-detail";
 import SuppliersPage from "./pages/suppliers";
 import SupplierDetailPage from "./pages/supplier-detail";
 import "@zorviz/ui/src/styles.css";
+import "@fontsource/nunito/900.css"; // Wurkz brand wordmark font (self-hosted, offline)
+import "./brand.css";
 import "./dyslexia.css";
 import "./stores/dyslexia"; // applies the persisted .dyslexic class at startup
 

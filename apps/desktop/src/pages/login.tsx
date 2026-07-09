@@ -65,7 +65,7 @@ export default function LoginPage() {
                         ) : (
                             <div className="flex flex-col items-center gap-1">
                                 <img src="/wurkz-mark.png" alt="" className="h-12 object-contain" />
-                                <span className="text-sm font-extrabold tracking-wide text-foreground/80">Wurkz</span>
+                                <span className="brand-wurkz text-sm text-foreground/80">Wurkz</span>
                             </div>
                         )}
                     </div>
