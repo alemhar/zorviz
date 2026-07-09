@@ -1888,6 +1888,24 @@ pub async fn sync_changes(
     ];
     let mut tables = serde_json::Map::new();
     let mut count = 0usize;
+
+    // Protocol v1.2 (BACK-4-009): shop-settings snapshot — a single curated row from app_config
+    // (formatting + policy context for cloud analytics, e.g. discount-cap breach detection).
+    // Explicit column list: NEVER the whole row — device_token/cloud_url must not leave the shop.
+    if let Ok(rows) = sqlx::query(
+        "SELECT id, shop_name, currency_symbol, tax_rate, vat_status, tax_inclusive, \
+                max_discount_pct, updated_at \
+         FROM app_config WHERE updated_at > ?",
+    )
+    .bind(since)
+    .fetch_all(&state.pool)
+    .await
+    {
+        let arr: Vec<Value> = rows.iter().map(|r| Value::Object(row_to_json(r))).collect();
+        count += arr.len();
+        tables.insert("shop_settings".to_string(), Value::Array(arr));
+    }
+
     for (table, marker) in specs {
         let sql = format!("SELECT * FROM {table} WHERE {marker} > ?");
         if let Ok(rows) = sqlx::query(&sql).bind(since).fetch_all(&state.pool).await {

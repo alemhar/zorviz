@@ -185,3 +185,66 @@ Sync payloads should be encrypted in transit and at rest on the cloud to protect
 - [ ] Key management strategy documented (what happens if device is lost)
 
 ---
+
+---
+
+# Cloud Analytics Suite (owner-request 2026-07-09 — subscription differentiators)
+
+> Reports computed **cloud-only** on already-synced data (the aging pattern): the desktop stays
+> lean/operational; the analysis is the subscription value. Split per owner decision:
+> **Part 1** = desktop capture gaps (below, BACK-4-009), **Part 2** = cloud features (BACK-4-010+).
+>
+> **Capture-gap audit (2026-07-09):** everything needed already syncs (drawer_sessions
+> closed_by/over_short, orders discounted_by/cancelled_by/completed_at/asset_id, expenses
+> voided_by, payments processed_by, order_items cost_at_sale, customers/assets/phones), except:
+> 1. **Shop settings snapshot** (currency, tax rate, VAT status, max-discount cap) — cloud needs it
+>    for correct money formatting and cap-breach detection → BACK-4-009 (the whole Part 1).
+> 2. **Service catalog / job codes** — service-mix grouping by free-text description is mushy;
+>    a canned-services catalog would fix it but is a real desktop UX feature → deferred, v1 of the
+>    service-mix report groups by exact description text (works because shops repeat phrasing).
+
+## BACK-4-009 · Part 1: Shop-settings snapshot sync (protocol v1.2)
+
+**Priority:** 🔴 High (prerequisite for cap-breach detection + correct formatting cloud-side)
+Desktop `sync_changes` emits a `shop_settings` single-row payload from `app_config`
+(shop_name, currency_symbol, tax_rate, vat_status, tax_inclusive, max_discount_pct — NO
+secrets: never device_token/cloud_url). `updated_at` marker. Cloud ignores unknown tables until
+Part 2 accepts it (additive, safe). Protocol doc gains a v1.2 note.
+
+## BACK-4-010 · Leak Watch (cloud) — variance by closer, discount/void watch
+
+**Priority:** 🔴 High (strongest sales hook for absentee owners)
+Drawer over/short history grouped by `closed_by` (pattern surface: "short 3× this month, all Ana");
+discounts by `discounted_by` with cap-breach flags (needs 009); voided expenses by `voided_by`;
+cancelled orders by `cancelled_by`. Money-gated.
+
+## BACK-4-011 · Money Finders (cloud) — service-due win-back, customer value, dead stock
+
+**Priority:** 🔴 High (generates revenue, not just reports)
+(a) Win-back list: assets whose last done job is 4–6+ months old, with customer name + phone —
+a call/text list. (b) Customer value ranking: lifetime paid, visits, last visit; top and lapsed.
+(c) Dead stock: no movement (order_items/adjustments) in 60/90d, valued at cost.
+
+## BACK-4-012 · Growth Proof (cloud) — trends, service mix, comeback rate
+
+**Priority:** 🟡 Medium-high
+(a) Revenue/profit/job-count by week & month w/ prior-period compare. (b) Service-mix
+profitability grouped by order_item description (v1; catalog later). (c) Comeback rate: same
+asset re-opened within 30d of done — per mechanic quality flag.
+
+## BACK-4-013 · Multi-shop consolidated view (cloud)
+
+**Priority:** 🟡 Medium (upsell for multi-branch owners; Option A already links owner→tenants)
+Side-by-side branches: revenue, profit, aging, leak indicators; consolidated totals.
+
+## BACK-4-014 · BIR compliance archive (cloud)
+
+**Priority:** 🟢 Lower
+Monthly VAT summary + Senior/PWD record rendered cloud-side, permanent archive, downloadable
+("your records survive the shop PC").
+
+## BACK-4-015 · Weekly anomaly digest (cloud, email)
+
+**Priority:** 🟡 Medium (retention feature — the cloud comes to the owner)
+Weekly email: drawer shorts, cap breaches/big discounts, expense spikes vs prior month, dead-stock
+delta, receivables aging movement. Needs a scheduler (Hostinger cron) + mail config.

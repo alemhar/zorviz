@@ -1,4 +1,4 @@
-# Cloud Sync Protocol (v1.1 — LOCKED; v1 2026-07-08, v1.1 2026-07-09)
+# Cloud Sync Protocol (v1.2 — LOCKED; v1 2026-07-08, v1.1/v1.2 2026-07-09)
 
 > **Status:** LOCKED v1 (decisions in §9 confirmed) — implementation in progress, backend parked.
 > This is the single contract both sides build
@@ -129,6 +129,13 @@ Reserved for multi-device / portal write-back. Shape TBD when we build bidirecti
     - New table 14: **`suppliers`** (`id`, `name`, `contact_person`, `phone`, `address`, `notes`,
       `created_at`, `updated_at`) — `updated_at` marker, upsert by (tenant_id, id). Desktop ids
       may be 32-char hex (migration backfill) rather than strict UUID.
+  - **v1.2 (2026-07-09, additive — BACK-4-009 cloud analytics prerequisite):** new
+    `shop_settings` payload — a single **curated** row projected from `app_config`
+    (`id`, `shop_name`, `currency_symbol`, `tax_rate`, `vat_status`, `tax_inclusive`,
+    `max_discount_pct`, `updated_at`; `updated_at` marker). Explicit column list — **secrets
+    (`device_token`, `cloud_url`) and local-only fields never leave the shop.** Gives the cloud
+    correct money formatting and policy context (e.g. discount-cap breach detection). Clouds on
+    v1.1 ignore the unknown table (additive-safe).
 
 ## 6. Trigger cadence (client)
 
