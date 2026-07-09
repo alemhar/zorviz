@@ -30,6 +30,27 @@
 3. Too gear-literal? Add: *"the gear teeth are part of the W's own strokes, not a gear surrounding it."*
 4. Reject any output with mangled "Wurkz" spelling — the most common AI-logo tell.
 
+## Round 2 (2026-07-09) — mark only; "Wurkz" as plain text beside it
+
+| Concern | Decision |
+|---|---|
+| Symbol | **Checkmark / motion mark** — plays on the name meaning WORKS, not repair imagery |
+| Style | Flat geometric solid |
+| Color | Same palette (#F97316 orange / #1F2937 steel) |
+| Container | Free-floating mark (badge added later only for the app icon) |
+| Text | "Wurkz" rendered as real text next to the mark — NOT part of the graphic |
+
+**Hero prompt (double-check forming a subtle W):**
+
+> Minimal flat vector logo mark, no text: two bold checkmarks placed side by side so together they subtly form the shape of a letter W. Chunky geometric solid shapes with confident thick strokes, no outlines, no gradients, no 3D. Industrial safety orange (#F97316) as the single color of the mark, on a plain white background. The mark floats freely with no badge or container. Feeling: dependable, energetic, "it just works" — like a quality-control stamp from a well-run workshop. Strong simple silhouette, instantly recognizable at 32 pixels.
+
+**Fallback (single check + motion streak):**
+
+> Minimal flat vector logo mark, no text: a single bold checkmark whose tail sweeps forward into a subtle motion streak, suggesting speed and completion. Chunky geometric solid shapes, no outlines, no gradients, no 3D. Industrial safety orange (#F97316), free-floating on a plain white background, no badge or container. Dependable and energetic — "done, and done fast." Clean silhouette readable at 32 pixels.
+
+*Fix-up if the two checks don't fuse:* "the two checkmarks share strokes and merge into one continuous zigzag form."
+*Wordmark pairing:* heavy rounded sans (e.g. Nunito Black / app font at 800) in #1F2937, typed as real text.
+
 ## When a winner is picked
 
 - [ ] Replace Tauri icons (`src-tauri/icons/`) — needs 32/128/256 px + .ico/.icns
