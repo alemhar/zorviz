@@ -32,12 +32,18 @@ export function createExpense(input: {
     amount: number; // centavos
     note?: string | null;
     paid_from_drawer: boolean;
+    receive_adjustment_id?: string | null; // BACK-3-016: settles an on-account stock receive
 }): Promise<Expense> {
     return api.post<Expense>("/api/expenses", input);
 }
 
 export function voidExpense(id: string): Promise<Expense> {
     return api.post<Expense>(`/api/expenses/${id}/void`);
+}
+
+// Recent live parts expenses not yet linked to a receive (BACK-3-016 picker).
+export function listLinkableExpenses(): Promise<Expense[]> {
+    return api.get<Expense[]>("/api/expenses/linkable");
 }
 
 export interface DrawerSession {
@@ -54,8 +60,26 @@ export interface DrawerSession {
     updated_at: number;
 }
 
-export function drawerStatus(): Promise<{ open: DrawerSession | null; last_closed: DrawerSession | null }> {
+export interface DrawerMovement {
+    id: string;
+    type: string; // 'cash_in' | 'cash_drop'
+    amount: number; // centavos
+    note: string | null;
+    author: string | null;
+    created_at: number;
+}
+
+export function drawerStatus(): Promise<{
+    open: DrawerSession | null;
+    last_closed: DrawerSession | null;
+    movements: DrawerMovement[];
+}> {
     return api.get("/api/drawer");
+}
+
+// Mid-day paid-in/paid-out (BACK-3-017). Not an expense: profit untouched, only the drawer.
+export function drawerMovement(type: "cash_in" | "cash_drop", amount: number, note?: string | null): Promise<DrawerMovement> {
+    return api.post<DrawerMovement>("/api/drawer/movement", { type, amount, note });
 }
 
 export function openDrawer(openingFloat: number): Promise<DrawerSession> {

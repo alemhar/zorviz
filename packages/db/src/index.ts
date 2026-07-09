@@ -23,6 +23,7 @@ export * from './modules/commerce/inventory-adjustments';
 export * from './modules/commerce/payments';
 export * from './modules/commerce/expenses';
 export * from './modules/commerce/drawer-sessions';
+export * from './modules/commerce/drawer-movements';
 
 // Assembled schema
 export * from './database';

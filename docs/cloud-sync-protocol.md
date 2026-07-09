@@ -66,7 +66,8 @@ Request:
     "payments":    [ … ],
     "expenses":        [ … ],
     "drawer_sessions": [ … ],
-    "order_status_history": [ … ]
+    "order_status_history": [ … ],
+    "drawer_movements": [ … ]
   }
 }
 ```
@@ -112,7 +113,9 @@ Reserved for multi-device / portal write-back. Shape TBD when we build bidirecti
     `order_items` gains `cost_at_sale`; `orders` gains `created_by`/`cancelled_by`/`discounted_by`;
     `payments.amount` is now the **per-payment** amount (multiple payments per order — partials);
     upsert-by-id semantics unchanged. `order_status_history` (0022) also syncs — append-only
-    movement log, `created_at` marker.
+    movement log, `created_at` marker. **0023 (BACK-3-016/017, additive):** `inventory_adjustments`
+    gains `expense_id`/`total_cost`/`on_account`; new `drawer_movements` table syncs append-only
+    (`created_at` marker).
   - Already have `updated_at` (no change): `orders`, `customers`, `assets`, `asset_types`, `bookings`.
   - `app_config` gains `last_synced_at` (the client watermark).
 

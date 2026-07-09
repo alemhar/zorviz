@@ -30,6 +30,7 @@ import { ApiError } from "../lib/api";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
 import { useConfirm } from "../components/confirm";
+import { listLinkableExpenses, type Expense } from "../lib/financials-api";
 
 // Margin % on cost: (price − cost) / cost. "—" when there's no cost to compare against.
 function marginPct(p: Part): string {
@@ -169,10 +170,10 @@ export default function InventoryPage() {
                                             <td className="p-2 text-right">{marginPct(p)}</td>
                                             {isStaff && (
                                                 <td className="p-2 pr-4 text-right whitespace-nowrap">
-                                                    <Button variant="ghost" size="sm" onClick={() => setAdjusting(p)}>
+                                                    <Button variant="ghost" size="sm" aria-label="Adjust stock" onClick={() => setAdjusting(p)}>
                                                         <PackagePlus className="w-4 h-4" />
                                                     </Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
+                                                    <Button variant="ghost" size="sm" aria-label="Edit item" onClick={() => setEditing(p)}>
                                                         <Pencil className="w-4 h-4" />
                                                     </Button>
                                                 </td>
@@ -198,8 +199,7 @@ export default function InventoryPage() {
                 />
             )}
             {adjusting && (
-                <AdjustDialog
-                    item={adjusting}
+                <AdjustDialog item={adjusting} currency={currency}
                     onClose={() => setAdjusting(null)}
                     onSaved={() => { setAdjusting(null); refresh(); }}
                 />
@@ -334,26 +334,62 @@ function ItemDialog({ item, currency, onClose, onSaved }: { item: Part | null; c
 }
 
 // Manual stock adjustment (BACK-3-005): Receive / Correction / Write-Off + qty + note.
-function AdjustDialog({ item, onClose, onSaved }: { item: Part; onClose: () => void; onSaved: () => void }) {
+// Adjust Stock. For a Receive, an optional money section (BACK-3-016) links the purchase:
+// pay now (auto-creates a linked parts expense), link an already-recorded expense, or charge
+// to the supplier's account (payable). Leaving the amount blank keeps the old behavior.
+function AdjustDialog({ item, currency, onClose, onSaved }: { item: Part; currency: string; onClose: () => void; onSaved: () => void }) {
     const [kind, setKind] = useState<AdjustmentType>("receive");
     const [qty, setQty] = useState("");
     const [note, setNote] = useState("");
+    // Money section (receive only)
+    const [payMode, setPayMode] = useState<"pay" | "link" | "account">("pay");
+    const [costStr, setCostStr] = useState("");
+    const [fromDrawer, setFromDrawer] = useState(true);
+    const [linkable, setLinkable] = useState<Expense[]>([]);
+    const [linkId, setLinkId] = useState("");
+    const [updateCost, setUpdateCost] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const confirm = useConfirm();
+
+    useEffect(() => {
+        listLinkableExpenses().then(setLinkable).catch(() => {});
+    }, []);
 
     const n = parseFloat(qty) || 0;
     // Receive adds; write-off subtracts; correction is signed as typed.
     const delta = kind === "receive" ? Math.abs(n) : kind === "writeoff" ? -Math.abs(n) : n;
     const after = item.stock_on_hand + delta;
 
+    const costC = toCentavos(parseFloat(costStr) || 0);
+    const linked = linkable.find((e) => e.id === linkId) ?? null;
+    const moneyC = payMode === "link" ? (linked?.amount ?? 0) : costC;
+    const impliedUnit = n > 0 && moneyC > 0 ? Math.round(moneyC / Math.abs(n)) : 0;
+    const costDiffers = impliedUnit > 0 && impliedUnit !== item.unit_cost;
+
     const save = async () => {
         if (!n) return setError("Enter a quantity.");
+        if (kind === "receive" && payMode === "account" && costC <= 0) {
+            return setError("Enter the amount owed for an on-account receive.");
+        }
         if (!(await confirm({ title: "Apply this stock adjustment?", verb: "Slide to apply" }))) return;
         setBusy(true);
         setError("");
         try {
-            await adjustStock(item.id, { type: kind, delta, note: note.trim() || null });
+            await adjustStock(item.id, {
+                type: kind,
+                delta,
+                note: note.trim() || null,
+                ...(kind === "receive"
+                    ? {
+                          total_cost: payMode === "link" ? null : costC > 0 ? costC : null,
+                          paid_from_drawer: fromDrawer,
+                          on_account: payMode === "account",
+                          link_expense_id: payMode === "link" && linkId ? linkId : null,
+                          update_unit_cost: updateCost && costDiffers,
+                      }
+                    : {}),
+            });
             onSaved();
         } catch (e) {
             setError(e instanceof ApiError && e.message ? e.message : "Adjustment failed.");
@@ -386,9 +422,84 @@ function AdjustDialog({ item, onClose, onSaved }: { item: Part; onClose: () => v
                         <Label htmlFor="adj-qty">Quantity{kind === "correction" ? " (signed, e.g. -2)" : ""}</Label>
                         <Input id="adj-qty" value={qty} onChange={(e) => setQty(e.target.value)} inputMode="decimal" />
                     </div>
+
+                    {kind === "receive" && (
+                        <div className="space-y-3 rounded-lg border p-3">
+                            <div className="text-sm font-medium">What did you pay?</div>
+                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                {([["pay", "Record payment"], ["link", "Link expense"], ["account", "On account"]] as const).map(([k, label]) => (
+                                    <button
+                                        key={k}
+                                        type="button"
+                                        onClick={() => setPayMode(k)}
+                                        className={`rounded-md border p-2 transition-colors ${payMode === k ? "bg-primary/10 border-primary text-primary" : "hover:bg-muted"}`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {payMode === "pay" && (
+                                <>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="adj-cost">Total paid <span className="text-muted-foreground font-normal">(blank = don't record money)</span></Label>
+                                        <Input id="adj-cost" value={costStr} onChange={(e) => setCostStr(e.target.value)} inputMode="decimal" placeholder="0.00" />
+                                    </div>
+                                    {costC > 0 && (
+                                        <div className="flex items-center justify-between gap-3 text-sm">
+                                            <span>Paid from the drawer</span>
+                                            <button
+                                                type="button" role="switch" aria-checked={fromDrawer}
+                                                onClick={() => setFromDrawer((v) => !v)}
+                                                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${fromDrawer ? "bg-primary" : "bg-muted"}`}
+                                            >
+                                                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${fromDrawer ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {payMode === "link" && (
+                                <div className="space-y-1">
+                                    <Label htmlFor="adj-link">Already-recorded parts expense</Label>
+                                    <select
+                                        id="adj-link"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                        value={linkId}
+                                        onChange={(e) => setLinkId(e.target.value)}
+                                    >
+                                        <option value="">— pick an expense —</option>
+                                        {linkable.map((e) => (
+                                            <option key={e.id} value={e.id}>
+                                                {formatMoney(e.amount, currency)} · {new Date(e.created_at).toLocaleDateString()}{e.note ? ` · ${e.note.slice(0, 40)}` : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {linkable.length === 0 && <p className="text-xs text-muted-foreground">No unlinked parts expenses found.</p>}
+                                </div>
+                            )}
+
+                            {payMode === "account" && (
+                                <div className="space-y-1">
+                                    <Label htmlFor="adj-owed">Amount owed to the supplier</Label>
+                                    <Input id="adj-owed" value={costStr} onChange={(e) => setCostStr(e.target.value)} inputMode="decimal" placeholder="0.00" />
+                                    <p className="text-xs text-muted-foreground">No money moves now — this becomes a payable until you record the paying expense.</p>
+                                </div>
+                            )}
+
+                            {costDiffers && (payMode !== "link" || linked) && (
+                                <label className="flex items-center gap-2 text-sm select-none">
+                                    <input type="checkbox" className="h-4 w-4" checked={updateCost} onChange={(e) => setUpdateCost(e.target.checked)} />
+                                    Update item cost to {formatMoney(impliedUnit, currency)}/unit (was {formatMoney(item.unit_cost, currency)})
+                                </label>
+                            )}
+                        </div>
+                    )}
+
                     <div className="space-y-1">
                         <Label htmlFor="adj-note">Note</Label>
-                        <Input id="adj-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. delivery from supplier" />
+                        <Input id="adj-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. delivery from AutoParts PH" />
                     </div>
                     <div className="text-sm text-muted-foreground">After adjustment: <span className="font-medium">{after}</span></div>
                     {error && <p className="text-sm text-destructive">{error}</p>}

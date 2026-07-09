@@ -1870,7 +1870,7 @@ pub async fn sync_changes(
     let since = q.since.unwrap_or(0);
     let tenant = tenant_id(&state).await;
     // (table, change-marker column) — must match docs/cloud-sync-protocol.md §5.
-    let specs: [(&str, &str); 12] = [
+    let specs: [(&str, &str); 13] = [
         ("customers", "updated_at"),
         ("assets", "updated_at"),
         ("asset_types", "updated_at"),
@@ -1883,6 +1883,7 @@ pub async fn sync_changes(
         ("expenses", "updated_at"),        // BACK-3-010 (soft-void bumps updated_at)
         ("drawer_sessions", "updated_at"), // BACK-3-011 (close bumps updated_at)
         ("order_status_history", "created_at"), // 0022: append-only movement log
+        ("drawer_movements", "created_at"),     // BACK-3-017: append-only paid-in/paid-out
     ];
     let mut tables = serde_json::Map::new();
     let mut count = 0usize;

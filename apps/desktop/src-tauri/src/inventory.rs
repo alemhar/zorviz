@@ -9,6 +9,7 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sqlx::Row;
 use std::collections::HashMap;
 
 use crate::api_data::{now_ms, require_staff, row_to_json};
@@ -116,10 +117,17 @@ pub struct AdjustReq {
     kind: String, // 'receive' | 'correction' | 'writeoff'
     delta: f64,   // signed change (UI derives sign from the type)
     note: Option<String>,
+    // BACK-3-016 — receive money section (all optional; blank = old behavior):
+    total_cost: Option<i64>,       // centavos paid (or owed when on_account)
+    paid_from_drawer: Option<bool>, // for the auto-created expense
+    on_account: Option<bool>,      // supplier credit — record the payable, no expense yet
+    link_expense_id: Option<String>, // attach a previously-recorded parts expense instead
+    update_unit_cost: Option<bool>, // refresh the item's unit_cost from total_cost/qty
 }
 
 /// POST /api/inventory/:id/adjust — manual stock adjustment, applied atomically and
-/// logged to inventory_adjustments with the acting user.
+/// logged to inventory_adjustments with the acting user. For receives, the optional money
+/// fields link/record the purchase (BACK-3-016): new expense, existing expense, or on-account.
 pub async fn adjust_inventory(
     State(state): State<ApiState>,
     headers: HeaderMap,
@@ -135,19 +143,94 @@ pub async fn adjust_inventory(
     if req.delta == 0.0 {
         return Err((StatusCode::BAD_REQUEST, "quantity can't be zero".to_string()));
     }
-    let result = sqlx::query("UPDATE inventory SET stock_on_hand = stock_on_hand + ?, updated_at = ? WHERE id = ?")
+
+    // Money fields only make sense on a receive.
+    let is_receive = req.kind == "receive";
+    let on_account = is_receive && req.on_account.unwrap_or(false);
+    let mut total_cost = if is_receive { req.total_cost.filter(|v| *v > 0) } else { None };
+    let link_expense = if is_receive {
+        req.link_expense_id.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+    if on_account && total_cost.is_none() {
+        return Err((StatusCode::BAD_REQUEST, "enter the amount owed for an on-account receive".to_string()));
+    }
+
+    // Linking an existing expense: validate it's a live parts expense and not already linked.
+    if let Some(exp_id) = &link_expense {
+        let ok: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM expenses WHERE id = ? AND category = 'parts' AND voided = 0 \
+             AND id NOT IN (SELECT expense_id FROM inventory_adjustments WHERE expense_id IS NOT NULL)",
+        )
+        .bind(exp_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
+        if ok == 0 {
+            return Err((StatusCode::CONFLICT, "That expense is unavailable (not a parts expense, voided, or already linked).".to_string()));
+        }
+        // Inherit the receive's money value from the linked expense unless given explicitly.
+        if total_cost.is_none() {
+            total_cost = sqlx::query_scalar("SELECT amount FROM expenses WHERE id = ? LIMIT 1")
+                .bind(exp_id)
+                .fetch_optional(&state.pool)
+                .await
+                .ok()
+                .flatten();
+        }
+    }
+
+    // Read the item (name/sku for the auto-expense note) and bump stock.
+    let item = sqlx::query("SELECT name, sku FROM inventory WHERE id = ? LIMIT 1")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "item not found".to_string()))?;
+    let item_name: String = item.try_get("name").unwrap_or_default();
+    let item_sku: String = item.try_get("sku").unwrap_or_default();
+
+    sqlx::query("UPDATE inventory SET stock_on_hand = stock_on_hand + ?, updated_at = ? WHERE id = ?")
         .bind(req.delta)
         .bind(now_ms())
         .bind(&id)
         .execute(&state.pool)
         .await
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "adjust failed".to_string()))?;
-    if result.rows_affected() == 0 {
-        return Err((StatusCode::NOT_FOUND, "item not found".to_string()));
-    }
+
     let note = req.note.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let now = now_ms();
+
+    // Auto-create the linked parts expense when a payment was recorded here (not on-account,
+    // not linking an existing one).
+    let mut expense_id = link_expense.clone();
+    if let (Some(cost), false, None) = (total_cost, on_account, link_expense.as_ref()) {
+        let exp_note = match &note {
+            Some(n) => format!("Receive {}× {} ({}) — {}", req.delta, item_name, item_sku, n),
+            None => format!("Receive {}× {} ({})", req.delta, item_name, item_sku),
+        };
+        let eid = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO expenses (id, category, amount, note, paid_from_drawer, author, voided, created_at, updated_at) \
+             VALUES (?, 'parts', ?, ?, ?, ?, 0, ?, ?)",
+        )
+        .bind(&eid)
+        .bind(cost)
+        .bind(&exp_note)
+        .bind(if req.paid_from_drawer.unwrap_or(true) { 1_i64 } else { 0_i64 })
+        .bind(&session.name)
+        .bind(now)
+        .bind(now)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "expense insert failed".to_string()))?;
+        expense_id = Some(eid);
+    }
+
     let _ = sqlx::query(
-        "INSERT INTO inventory_adjustments (id, item_id, type, delta, note, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO inventory_adjustments (id, item_id, type, delta, note, author, expense_id, total_cost, on_account, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(uuid::Uuid::new_v4().to_string())
     .bind(&id)
@@ -155,10 +238,48 @@ pub async fn adjust_inventory(
     .bind(req.delta)
     .bind(&note)
     .bind(&session.name)
-    .bind(now_ms())
+    .bind(&expense_id)
+    .bind(total_cost)
+    .bind(if on_account { 1_i64 } else { 0_i64 })
+    .bind(now)
     .execute(&state.pool)
     .await;
+
+    // Optionally refresh the item's reference cost from this purchase.
+    if req.update_unit_cost.unwrap_or(false) {
+        if let Some(cost) = total_cost {
+            let qty = req.delta.abs();
+            if qty > 0.0 {
+                let unit = (cost as f64 / qty).round() as i64;
+                let _ = sqlx::query("UPDATE inventory SET unit_cost = ?, updated_at = ? WHERE id = ?")
+                    .bind(unit)
+                    .bind(now_ms())
+                    .bind(&id)
+                    .execute(&state.pool)
+                    .await;
+            }
+        }
+    }
+
     fetch_item(&state, &id).await
+}
+
+/// GET /api/inventory/payables — outstanding on-account receives (owed to suppliers, not yet
+/// settled by a linked expense). Staff only.
+pub async fn list_payables(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<Value>>, StatusCode> {
+    require_staff(&state, &headers)?;
+    let rows = sqlx::query(
+        "SELECT a.id, a.item_id, a.delta, a.total_cost, a.note, a.created_at, i.name AS item_name, i.sku \
+         FROM inventory_adjustments a JOIN inventory i ON i.id = a.item_id \
+         WHERE a.on_account = 1 AND a.expense_id IS NULL ORDER BY a.created_at DESC LIMIT 100",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(rows.iter().map(|r| Value::Object(row_to_json(r))).collect()))
 }
 
 /// GET /api/inventory/:id/adjustments — the item's adjustment log, newest first.

@@ -64,7 +64,35 @@ export interface StockAdjustment {
 }
 
 // Manual stock adjustment (delta is signed; logged with the acting user).
-export function adjustStock(id: string, input: { type: AdjustmentType; delta: number; note?: string | null }): Promise<Part> {
+export interface AdjustInput {
+    type: AdjustmentType;
+    delta: number;
+    note?: string | null;
+    // BACK-3-016 (receive only, all optional):
+    total_cost?: number | null; // centavos paid (or owed when on_account)
+    paid_from_drawer?: boolean;
+    on_account?: boolean; // supplier credit -> payable, no expense yet
+    link_expense_id?: string | null; // attach an already-recorded parts expense
+    update_unit_cost?: boolean; // refresh the item's reference cost from this purchase
+}
+
+export interface Payable {
+    id: string; // adjustment id
+    item_id: string;
+    item_name: string;
+    sku: string;
+    delta: number;
+    total_cost: number;
+    note: string | null;
+    created_at: number;
+}
+
+// Outstanding on-account receives (owed to suppliers, not yet settled).
+export function listPayables(): Promise<Payable[]> {
+    return api.get<Payable[]>("/api/inventory/payables");
+}
+
+export function adjustStock(id: string, input: AdjustInput): Promise<Part> {
     return api.post<Part>(`/api/inventory/${id}/adjust`, input);
 }
 

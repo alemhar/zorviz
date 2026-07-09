@@ -14,6 +14,7 @@ import type { InventoryAdjustmentsTable } from './modules/commerce/inventory-adj
 import type { PaymentsTable } from './modules/commerce/payments';
 import type { ExpensesTable } from './modules/commerce/expenses';
 import type { DrawerSessionsTable } from './modules/commerce/drawer-sessions';
+import type { DrawerMovementsTable } from './modules/commerce/drawer-movements';
 
 // The Kysely database schema: table-name → row type. Assembled from the domain-scoped
 // table definitions in ./core and ./modules (BACK-1-001).
@@ -34,5 +35,6 @@ export interface Database {
     payments: PaymentsTable;
     expenses: ExpensesTable;
     drawer_sessions: DrawerSessionsTable;
+    drawer_movements: DrawerMovementsTable;
     order_status_history: OrderStatusHistoryTable;
 }

@@ -38,6 +38,8 @@ pub struct CreateExpenseReq {
     note: Option<String>,
     #[serde(default = "default_true")]
     paid_from_drawer: bool,
+    // BACK-3-016: optional — this expense settles an outstanding on-account stock receive.
+    receive_adjustment_id: Option<String>,
 }
 fn default_true() -> bool {
     true
@@ -57,6 +59,28 @@ pub async fn create_expense(
     if req.amount <= 0 {
         return Err((StatusCode::BAD_REQUEST, "the amount must be greater than zero".to_string()));
     }
+    // Settling a payable (BACK-3-016): the target must be an outstanding on-account receive.
+    let settle = req
+        .receive_adjustment_id
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    if let Some(adj_id) = &settle {
+        if category != "parts" {
+            return Err((StatusCode::BAD_REQUEST, "only a parts expense can settle a stock receive".to_string()));
+        }
+        let ok: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM inventory_adjustments WHERE id = ? AND on_account = 1 AND expense_id IS NULL",
+        )
+        .bind(adj_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
+        if ok == 0 {
+            return Err((StatusCode::CONFLICT, "That receive is not an outstanding payable.".to_string()));
+        }
+    }
+
     let author = session_from_headers(&state, &headers).map(|s| s.name);
     let note = req.note.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
     let id = uuid::Uuid::new_v4().to_string();
@@ -76,6 +100,15 @@ pub async fn create_expense(
     .execute(&state.pool)
     .await
     .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "could not record the expense".to_string()))?;
+
+    // Link the settled receive to this expense (clears it from the payables list).
+    if let Some(adj_id) = &settle {
+        let _ = sqlx::query("UPDATE inventory_adjustments SET expense_id = ? WHERE id = ?")
+            .bind(&id)
+            .bind(adj_id)
+            .execute(&state.pool)
+            .await;
+    }
 
     let row = sqlx::query("SELECT * FROM expenses WHERE id = ? LIMIT 1")
         .bind(&id)
@@ -111,6 +144,80 @@ pub async fn void_expense(
     Ok(Json(Value::Object(row_to_json(&row))))
 }
 
+/// GET /api/expenses/linkable — recent live parts expenses not yet linked to a receive
+/// (candidates for "this receive was already paid"). Staff only.
+pub async fn list_linkable_expenses(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    require_staff(&state, &headers)?;
+    let rows = sqlx::query(
+        "SELECT id, amount, note, author, created_at FROM expenses \
+         WHERE category = 'parts' AND voided = 0 \
+         AND id NOT IN (SELECT expense_id FROM inventory_adjustments WHERE expense_id IS NOT NULL) \
+         ORDER BY created_at DESC LIMIT 20",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(Value::Array(rows.iter().map(|r| Value::Object(row_to_json(r))).collect())))
+}
+
+// ---- Drawer movements (BACK-3-017): POS paid-in/paid-out ----
+
+#[derive(Deserialize)]
+pub struct MovementReq {
+    #[serde(rename = "type")]
+    kind: String, // 'cash_in' | 'cash_drop'
+    amount: i64,  // centavos
+    note: Option<String>,
+}
+
+/// POST /api/drawer/movement — mid-day cash in (top-up) or cash drop (to safe/bank).
+/// NOT an expense: the money changes location, not ownership — profit is untouched; only the
+/// drawer expectation moves. Requires an open session. Staff only.
+pub async fn drawer_movement(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(req): Json<MovementReq>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    require_staff(&state, &headers).map_err(|s| (s, "staff only".to_string()))?;
+    if !matches!(req.kind.as_str(), "cash_in" | "cash_drop") {
+        return Err((StatusCode::BAD_REQUEST, "invalid movement type".to_string()));
+    }
+    if req.amount <= 0 {
+        return Err((StatusCode::BAD_REQUEST, "the amount must be greater than zero".to_string()));
+    }
+    let open: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM drawer_sessions WHERE closed_at IS NULL")
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
+    if open == 0 {
+        return Err((StatusCode::CONFLICT, "No open drawer session — open the day first.".to_string()));
+    }
+    let author = session_from_headers(&state, &headers).map(|s| s.name);
+    let note = req.note.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let id = uuid::Uuid::new_v4().to_string();
+    sqlx::query(
+        "INSERT INTO drawer_movements (id, type, amount, note, author, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&id)
+    .bind(&req.kind)
+    .bind(req.amount)
+    .bind(&note)
+    .bind(&author)
+    .bind(now_ms())
+    .execute(&state.pool)
+    .await
+    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "could not record the movement".to_string()))?;
+    let row = sqlx::query("SELECT * FROM drawer_movements WHERE id = ? LIMIT 1")
+        .bind(&id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "read failed".to_string()))?;
+    Ok(Json(Value::Object(row_to_json(&row))))
+}
+
 // ---- Drawer sessions (BACK-3-011) ----
 
 /// GET /api/drawer — the open session (if any) + the most recent closed one. Staff only.
@@ -131,7 +238,17 @@ pub async fn drawer_status(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .map(|r| Value::Object(row_to_json(&r)))
         .unwrap_or(Value::Null);
-    Ok(Json(json!({ "open": open, "last_closed": last_closed })))
+    // Movements within the open session (for display on the drawer card).
+    let movements = match open.get("opened_at").and_then(|v| v.as_i64()) {
+        Some(opened_at) => sqlx::query("SELECT * FROM drawer_movements WHERE created_at >= ? ORDER BY created_at DESC")
+            .bind(opened_at)
+            .fetch_all(&state.pool)
+            .await
+            .map(|rows| rows.iter().map(|r| Value::Object(row_to_json(r))).collect::<Vec<_>>())
+            .unwrap_or_default(),
+        None => vec![],
+    };
+    Ok(Json(json!({ "open": open, "last_closed": last_closed, "movements": movements })))
 }
 
 #[derive(Deserialize)]
@@ -221,7 +338,23 @@ pub async fn close_drawer(
     .await
     .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
 
-    let expected = opening_float + cash_in - cash_out;
+    // BACK-3-017: mid-day movements — top-ups add, safe/bank drops subtract.
+    let moved_in: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(amount), 0) FROM drawer_movements WHERE type = 'cash_in' AND created_at >= ?",
+    )
+    .bind(opened_at)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
+    let dropped: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(SUM(amount), 0) FROM drawer_movements WHERE type = 'cash_drop' AND created_at >= ?",
+    )
+    .bind(opened_at)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
+
+    let expected = opening_float + cash_in - cash_out + moved_in - dropped;
     let over_short = req.counted_cash - expected; // negative = short
     let closed_by = session_from_headers(&state, &headers).map(|s| s.name);
     let now = now_ms();

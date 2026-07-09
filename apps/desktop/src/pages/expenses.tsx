@@ -22,6 +22,7 @@ import {
     EXPENSE_CATEGORIES,
     type Expense,
 } from "../lib/financials-api";
+import { listPayables, type Payable } from "../lib/inventory-api";
 import { useAuthStore } from "../stores/auth";
 import { useAppConfigStore } from "../stores/app-config";
 import { useConfirm } from "../components/confirm";
@@ -44,6 +45,8 @@ export default function ExpensesPage() {
     const [amountStr, setAmountStr] = useState("");
     const [note, setNote] = useState("");
     const [fromDrawer, setFromDrawer] = useState(true);
+    const [payables, setPayables] = useState<Payable[]>([]);
+    const [settleId, setSettleId] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -57,8 +60,10 @@ export default function ExpensesPage() {
         setAmountStr("");
         setNote("");
         setFromDrawer(true);
+        setSettleId("");
         setError("");
         setAddOpen(true);
+        listPayables().then(setPayables).catch(() => {});
     };
 
     const amountC = toCentavos(parseFloat(amountStr) || 0);
@@ -69,7 +74,13 @@ export default function ExpensesPage() {
         setSaving(true);
         setError("");
         try {
-            await createExpense({ category, amount: amountC, note: note.trim() || null, paid_from_drawer: fromDrawer });
+            await createExpense({
+                category,
+                amount: amountC,
+                note: note.trim() || null,
+                paid_from_drawer: fromDrawer,
+                receive_adjustment_id: category === "parts" && settleId ? settleId : null,
+            });
             setAddOpen(false);
             refresh();
         } catch {
@@ -165,6 +176,29 @@ export default function ExpensesPage() {
                             <Label htmlFor="exp-amount">Amount</Label>
                             <Input id="exp-amount" value={amountStr} onChange={(e) => setAmountStr(e.target.value)} inputMode="decimal" placeholder="0.00" autoFocus />
                         </div>
+                        {category === "parts" && payables.length > 0 && (
+                            <div className="space-y-1">
+                                <Label htmlFor="exp-settle">Pays for a stock receive <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                                <select
+                                    id="exp-settle"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    value={settleId}
+                                    onChange={(e) => {
+                                        setSettleId(e.target.value);
+                                        const pb = payables.find((x) => x.id === e.target.value);
+                                        if (pb && !amountStr) setAmountStr(String(pb.total_cost / 100));
+                                    }}
+                                >
+                                    <option value="">{"\u2014 not settling a payable \u2014"}</option>
+                                    {payables.map((pb) => (
+                                        <option key={pb.id} value={pb.id}>
+                                            {pb.item_name} ({pb.sku}) {"\u00b7"} {formatMoney(pb.total_cost, currency)} owed {"\u00b7"} {new Date(pb.created_at).toLocaleDateString()}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-muted-foreground">Clears the supplier payable for that receive.</p>
+                            </div>
+                        )}
                         <div className="space-y-1">
                             <Label htmlFor="exp-note">Note</Label>
                             <Input id="exp-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. compressor from AutoParts PH" />

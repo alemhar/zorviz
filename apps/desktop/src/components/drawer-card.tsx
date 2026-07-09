@@ -12,7 +12,7 @@ import {
 } from "@zorviz/ui";
 import { Banknote } from "lucide-react";
 import { formatMoney, toCentavos } from "@zorviz/core";
-import { drawerStatus, openDrawer, closeDrawer, type DrawerSession } from "../lib/financials-api";
+import { drawerStatus, openDrawer, closeDrawer, drawerMovement, type DrawerSession, type DrawerMovement } from "../lib/financials-api";
 import { useAppConfigStore } from "../stores/app-config";
 import { useConfirm } from "../components/confirm";
 import { toast } from "../stores/toast";
@@ -26,15 +26,16 @@ export function DrawerCard() {
 
     const [open, setOpen] = useState<DrawerSession | null>(null);
     const [lastClosed, setLastClosed] = useState<DrawerSession | null>(null);
+    const [movements, setMovements] = useState<DrawerMovement[]>([]);
     const [loaded, setLoaded] = useState(false);
-    const [dialog, setDialog] = useState<"open" | "close" | null>(null);
+    const [dialog, setDialog] = useState<"open" | "close" | "cash_in" | "cash_drop" | null>(null);
     const [amountStr, setAmountStr] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
     const refresh = useCallback(() => {
         drawerStatus()
-            .then((s) => { setOpen(s.open); setLastClosed(s.last_closed); })
+            .then((s) => { setOpen(s.open); setLastClosed(s.last_closed); setMovements(s.movements ?? []); })
             .catch(() => {})
             .finally(() => setLoaded(true));
     }, []);
@@ -42,7 +43,7 @@ export function DrawerCard() {
 
     const amountC = toCentavos(parseFloat(amountStr) || 0);
 
-    const showDialog = (kind: "open" | "close") => {
+    const showDialog = (kind: "open" | "close" | "cash_in" | "cash_drop") => {
         setAmountStr("");
         setError("");
         setDialog(kind);
@@ -50,6 +51,24 @@ export function DrawerCard() {
 
     const submit = async () => {
         const opening = dialog === "open";
+        // Mid-day movements (BACK-3-017): a location change, not spending - profit untouched.
+        if (dialog === "cash_in" || dialog === "cash_drop") {
+            const isIn = dialog === "cash_in";
+            if (!(await confirm({ title: isIn ? "Add this cash to the drawer?" : "Move this cash to the safe/bank?", verb: isIn ? "Slide to add" : "Slide to remove" }))) return;
+            setBusy(true);
+            setError("");
+            try {
+                await drawerMovement(dialog, amountC);
+                toast(isIn ? "Cash added to the drawer" : "Cash drop recorded", "success");
+                setDialog(null);
+                refresh();
+            } catch {
+                setError("Could not record the movement.");
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
         const title = opening ? "Open the day with this float?" : "Close the day with this count?";
         if (!(await confirm({ title, verb: opening ? "Slide to open" : "Slide to close" }))) return;
         setBusy(true);
@@ -92,9 +111,16 @@ export function DrawerCard() {
                         Open since {new Date(open.opened_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
                         {open.opened_by ? ` by ${open.opened_by}` : ""} · float {formatMoney(open.opening_float, currency)}
                     </p>
-                    <Button variant="outline" className="mt-2" onClick={() => showDialog("close")}>
-                        Close Day
-                    </Button>
+                    {movements.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            This session: {movements.filter((m) => m.type === "cash_in").length} cash-in, {movements.filter((m) => m.type === "cash_drop").length} drop(s)
+                        </p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => showDialog("cash_in")}>Cash In</Button>
+                        <Button variant="outline" size="sm" onClick={() => showDialog("cash_drop")}>Cash Drop</Button>
+                        <Button variant="outline" size="sm" onClick={() => showDialog("close")}>Close Day</Button>
+                    </div>
                 </>
             ) : (
                 <>
@@ -118,22 +144,28 @@ export function DrawerCard() {
             <Dialog open={dialog !== null} onOpenChange={(o) => { if (!busy && !o) setDialog(null); }}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>{dialog === "open" ? "Open the day" : "Close the day"}</DialogTitle>
+                        <DialogTitle>
+                            {dialog === "open" ? "Open the day" : dialog === "close" ? "Close the day" : dialog === "cash_in" ? "Cash in (top-up)" : "Cash drop (to safe/bank)"}
+                        </DialogTitle>
                         <DialogDescription>
                             {dialog === "open"
                                 ? "How much cash is in the drawer right now (the float)?"
-                                : "Count the drawer and enter the total cash in it."}
+                                : dialog === "close"
+                                  ? "Count the drawer and enter the total cash in it."
+                                  : dialog === "cash_in"
+                                    ? "Money added that is not a sale (e.g. change fund). Not an expense."
+                                    : "Money moved out that is not spending (e.g. to the safe). Not an expense."}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-1">
-                        <Label htmlFor="drawer-amt">{dialog === "open" ? "Opening float" : "Counted cash"}</Label>
+                        <Label htmlFor="drawer-amt">{dialog === "open" ? "Opening float" : dialog === "close" ? "Counted cash" : "Amount"}</Label>
                         <Input id="drawer-amt" value={amountStr} onChange={(e) => setAmountStr(e.target.value)} inputMode="decimal" placeholder="0.00" autoFocus />
                         {error && <p className="text-sm text-destructive">{error}</p>}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Cancel</Button>
                         <Button onClick={submit} disabled={busy || amountStr.trim() === ""}>
-                            {busy ? "Saving…" : dialog === "open" ? "Open Day" : "Close Day"}
+                            {busy ? "Saving…" : dialog === "open" ? "Open Day" : dialog === "close" ? "Close Day" : dialog === "cash_in" ? "Add Cash" : "Record Drop"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -158,3 +158,49 @@ photos/payments pattern): `orders.created_by` (intake), `orders.cancelled_by`, `
 All invisible — no UI input added. (Comeback/warranty flag deliberately deferred.)
 
 ---
+
+## BACK-3-014 · Cloud — Gross-Margin Tile (pro-rata COGS) · *implemented, pending verification*
+
+**Priority:** 🟡 Medium · **Origin:** owner-approved inventory/cash-flow audit, 2026-07-09.
+Money section gains **Gross margin {period}**: revenue − pro-rata COGS, where each payment carries
+its share of the order's COGS (`Σ cost_at_sale × qty`, services = 0) × amount/total — same basis
+as the VAT tile (decision B). Data already exists (BACK-3-013 snapshots).
+
+---
+
+## BACK-3-015 · Cloud — Inventory Valuation Stat · *implemented, pending verification*
+
+**Priority:** 🟢 Low · **Origin:** same audit.
+Ops-visible stat: **Inventory value** = Σ max(stock_on_hand, 0) × unit_cost — the capital sitting
+on shelves. Ops per the owner's "inventory = operations" ruling (admins see it).
+
+---
+
+## BACK-3-016 · Receive ↔ Expense Linking + Supplier Payables (on account) · *implemented, pending verification*
+
+**Priority:** 🔴 High (kills the buy-side double entry; adds the Payables number)
+**Origin:** owner-designed 2026-07-09 (all money fields soft/optional — skip = today's behavior).
+Receive in Adjust Stock gains a money section with four soft modes:
+**Record payment** (total paid + from-drawer → auto-creates a linked `parts` expense),
+**Link existing expense** (picker of recent unlinked parts expenses — cash was logged earlier),
+**Charged to account** (amount owed captured, NO expense — supplier credit → payables),
+**Skip** (blank, unchanged behavior). Optional "update item cost" checkbox when the implied unit
+cost differs. Settlement: Add-Expense (parts) gains an optional "pays for a stock receive" picker
+of outstanding on-account receives → links + clears the payable on the day cash actually moves.
+Schema: `inventory_adjustments` + `expense_id`, `total_cost`, `on_account`. Outstanding payables =
+`on_account=1 AND expense_id IS NULL`. Cloud money tile: **Owed to suppliers**. Supplier identity =
+note text for v1 (suppliers table reserved). Voiding a linked expense never un-receives stock.
+
+---
+
+## BACK-3-017 · Drawer Cash In / Cash Drop (mid-day movements) · *implemented, pending verification*
+
+**Priority:** 🔴 High (without it, top-ups/safe-drops falsely show over/short at close)
+**Origin:** owner question 2026-07-09 — no way to add/remove drawer cash mid-session today.
+POS-style paid-in/paid-out: `drawer_movements` (type `cash_in` | `cash_drop`, amount, note, author,
+created_at; append-only, synced). **Not expenses** — location change, not spending; profit untouched.
+Drawer card (open session) gains **Cash In** / **Cash Drop** buttons (amount + note, confirmed).
+Close formula becomes: expected = float + cash payments − drawer expenses **+ cash ins − cash drops**
+(session window). Safe-drop trail doubles as anti-theft visibility for the owner.
+
+---
