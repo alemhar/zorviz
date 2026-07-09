@@ -267,7 +267,13 @@ function PayablesPreview({ items, cur }: { items: Payable[]; cur: string }) {
                     {[...groups.entries()].map(([supplier, rows]) => (
                         <div key={supplier} className="space-y-1">
                             <div className="flex items-baseline justify-between gap-3 text-sm font-semibold border-b pb-1">
-                                <span>{supplier}</span>
+                                {rows[0].supplier_id ? (
+                                    <button className="hover:text-primary hover:underline transition-colors" onClick={() => navigate(`/suppliers/${rows[0].supplier_id}`)}>
+                                        {supplier}
+                                    </button>
+                                ) : (
+                                    <span>{supplier}</span>
+                                )}
                                 <span className="tabular-nums">{formatMoney(rows.reduce((a, p) => a + p.balance, 0), cur)}</span>
                             </div>
                             {rows.map((p) => (
@@ -281,7 +287,7 @@ function PayablesPreview({ items, cur }: { items: Payable[]; cur: string }) {
                                         </div>
                                     </div>
                                     <span className="tabular-nums shrink-0">{formatMoney(p.balance, cur)}</span>
-                                    <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate("/expenses", { state: { settlePayableId: p.id } })}>
+                                    <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate("/expenses", { state: { settlePayableId: p.id, returnTo: "/reports/payables" } })}>
                                         Settle
                                     </Button>
                                 </div>
@@ -299,6 +305,7 @@ function PayablesPreview({ items, cur }: { items: Payable[]; cur: string }) {
 }
 
 function ReceivablesPreview({ rows, cur }: { rows: ReceivableRow[]; cur: string }) {
+    const navigate = useNavigate();
     const config = useAppConfigStore((s) => s.config);
     const userName = useAuthStore((s) => s.user?.name ?? null);
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -320,12 +327,12 @@ function ReceivablesPreview({ rows, cur }: { rows: ReceivableRow[]; cur: string 
                     <div className="space-y-1">
                         {rows.map((c) => (
                             <div key={c.customer_id} className="flex items-center gap-3 py-1.5 text-sm border-t border-border/50 first:border-t-0">
-                                <div className="min-w-0 flex-1">
-                                    <div className="font-medium truncate">{c.name}</div>
+                                <button className="min-w-0 flex-1 text-left group" onClick={() => navigate(`/customers/${c.customer_id}`)}>
+                                    <div className="font-medium truncate group-hover:text-primary transition-colors">{c.name}</div>
                                     <div className="text-xs text-muted-foreground">
                                         {c.phone ? `${c.phone} · ` : ""}{c.jobs} open job{c.jobs === 1 ? "" : "s"} · oldest {fmtD(c.oldest_at)}
                                     </div>
-                                </div>
+                                </button>
                                 <span className="tabular-nums shrink-0 font-medium">{formatMoney(c.balance, cur)}</span>
                                 <Button size="sm" variant="outline" className="shrink-0" disabled={busyId !== null} onClick={() => void downloadSoa(c)}>
                                     {busyId === c.customer_id ? "…" : "SOA"}
@@ -338,7 +345,7 @@ function ReceivablesPreview({ rows, cur }: { rows: ReceivableRow[]; cur: string 
             ) : (
                 <Empty>No outstanding customer balances. All done jobs are fully paid.</Empty>
             )}
-            <Note>SOA downloads the customer's Statement of Account. Collect payment on the job ticket's Billing card.</Note>
+            <Note>Tap a customer to open their profile and collect per job; SOA downloads their Statement of Account.</Note>
         </div>
     );
 }

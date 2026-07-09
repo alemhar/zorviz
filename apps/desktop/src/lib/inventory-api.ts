@@ -87,6 +87,7 @@ export interface Payable {
     balance: number; // remaining owed after partial settlements
     note: string | null;
     supplier: string | null;
+    supplier_id: string | null;
     created_at: number;
 }
 
@@ -95,10 +96,6 @@ export function listPayables(): Promise<Payable[]> {
     return api.get<Payable[]>("/api/inventory/payables");
 }
 
-// Distinct supplier names from past receives (autocomplete).
-export function listSuppliers(): Promise<string[]> {
-    return api.get<string[]>("/api/inventory/suppliers");
-}
 
 export function adjustStock(id: string, input: AdjustInput): Promise<Part> {
     return api.post<Part>(`/api/inventory/${id}/adjust`, input);

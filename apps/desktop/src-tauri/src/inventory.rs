@@ -230,14 +230,20 @@ pub async fn adjust_inventory(
         expense_id = Some(eid);
     }
 
+    // Supplier: a typed name finds-or-creates the master record; both the id link and the
+    // denormalized display name are stored.
     let supplier = if is_receive {
         req.supplier.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
     } else {
         None
     };
+    let supplier_id = match &supplier {
+        Some(name) => crate::suppliers::find_or_create_by_name(&state.pool, name).await,
+        None => None,
+    };
     let _ = sqlx::query(
-        "INSERT INTO inventory_adjustments (id, item_id, type, delta, note, author, expense_id, total_cost, on_account, supplier, created_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO inventory_adjustments (id, item_id, type, delta, note, author, expense_id, total_cost, on_account, supplier, supplier_id, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(uuid::Uuid::new_v4().to_string())
     .bind(&id)
@@ -249,6 +255,7 @@ pub async fn adjust_inventory(
     .bind(total_cost)
     .bind(if on_account { 1_i64 } else { 0_i64 })
     .bind(&supplier)
+    .bind(&supplier_id)
     .bind(now)
     .execute(&state.pool)
     .await;
@@ -280,7 +287,7 @@ pub async fn list_payables(
 ) -> Result<Json<Vec<Value>>, StatusCode> {
     require_staff(&state, &headers)?;
     let rows = sqlx::query(
-        "SELECT a.id, a.item_id, a.delta, a.total_cost, a.note, a.supplier, a.created_at, i.name AS item_name, i.sku, \
+        "SELECT a.id, a.item_id, a.delta, a.total_cost, a.note, a.supplier, a.supplier_id, a.created_at, i.name AS item_name, i.sku, \
                 a.total_cost - COALESCE((SELECT SUM(e.amount) FROM expenses e \
                     WHERE e.receive_id = a.id AND e.voided = 0), 0) AS balance \
          FROM inventory_adjustments a JOIN inventory i ON i.id = a.item_id \
@@ -295,22 +302,6 @@ pub async fn list_payables(
     Ok(Json(rows.iter().map(|r| Value::Object(row_to_json(r))).collect()))
 }
 
-/// GET /api/inventory/suppliers — distinct supplier names from past receives, for the
-/// receive dialog's autocomplete. Staff only.
-pub async fn list_suppliers(
-    State(state): State<ApiState>,
-    headers: HeaderMap,
-) -> Result<Json<Vec<String>>, StatusCode> {
-    require_staff(&state, &headers)?;
-    let rows = sqlx::query(
-        "SELECT DISTINCT supplier FROM inventory_adjustments \
-         WHERE supplier IS NOT NULL AND supplier != '' ORDER BY supplier LIMIT 200",
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(rows.iter().filter_map(|r| r.try_get::<String, _>("supplier").ok()).collect()))
-}
 
 /// GET /api/inventory/:id/adjustments — the item's adjustment log, newest first.
 pub async fn list_adjustments(

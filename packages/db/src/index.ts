@@ -24,6 +24,7 @@ export * from './modules/commerce/payments';
 export * from './modules/commerce/expenses';
 export * from './modules/commerce/drawer-sessions';
 export * from './modules/commerce/drawer-movements';
+export * from './modules/commerce/suppliers';
 
 // Assembled schema
 export * from './database';

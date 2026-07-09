@@ -9,12 +9,14 @@ pub mod asset_types;
 pub mod auth;
 pub mod backup;
 pub mod bookings;
+pub mod customers;
 pub mod db;
 pub mod financials;
 pub mod inventory;
 pub mod license;
 pub mod media;
 pub mod server;
+pub mod suppliers;
 
 use tauri::Manager;
 use std::sync::Mutex;

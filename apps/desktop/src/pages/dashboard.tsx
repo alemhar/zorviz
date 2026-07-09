@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { formatMoney } from "@zorviz/core";
 import { ServerStatus } from "../components/server-status";
 import { CloudStatus } from "../components/cloud-status";
-import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp, DatabaseBackup, Users, CalendarDays, Wallet, FileBarChart } from "lucide-react";
+import { Wrench, Package, Settings, ChevronRight, Car, ClipboardList, TrendingUp, DatabaseBackup, Users, CalendarDays, Wallet, FileBarChart, BookUser, Truck } from "lucide-react";
 import { DrawerCard } from "../components/drawer-card";
 import { BackupDialog } from "../features/backup/BackupDialog";
 import { api } from "../lib/api";
@@ -117,6 +117,24 @@ export default function DashboardPage() {
                 icon: Package,
                 href: "/inventory",
                 color: "from-emerald-500 to-emerald-600",
+            }]
+            : []),
+        ...(user?.role === "admin" || user?.role === "owner" || user?.role === "advisor"
+            ? [{
+                title: "Customers",
+                description: "Directory, balances & job history",
+                icon: BookUser,
+                href: "/customers",
+                color: "from-teal-500 to-teal-600",
+            }]
+            : []),
+        ...(user?.role === "admin" || user?.role === "owner" || user?.role === "advisor"
+            ? [{
+                title: "Suppliers",
+                description: "Who you buy from & what you owe",
+                icon: Truck,
+                href: "/suppliers",
+                color: "from-orange-500 to-orange-600",
             }]
             : []),
         ...(user?.role === "admin" || user?.role === "owner" || user?.role === "advisor"

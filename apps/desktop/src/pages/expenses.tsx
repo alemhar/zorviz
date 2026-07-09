@@ -74,25 +74,25 @@ export default function ExpensesPage() {
         }).catch(() => {});
     }, []);
 
-    // Settle handoff from the payables report page. Cancel/save returns there, not here.
-    const [fromSettle, setFromSettle] = useState(false);
+    // Settle handoff (payables report or supplier profile). Cancel/save returns to the origin.
+    const [returnTo, setReturnTo] = useState<string | null>(null);
     const location = useLocation();
     useEffect(() => {
-        const settle = (location.state as { settlePayableId?: string } | null)?.settlePayableId;
-        if (settle) {
-            setFromSettle(true);
-            openAdd(settle);
+        const st = location.state as { settlePayableId?: string; returnTo?: string } | null;
+        if (st?.settlePayableId) {
+            setReturnTo(st.returnTo ?? "/reports/payables");
+            openAdd(st.settlePayableId);
             navigate(".", { replace: true, state: null }); // consume so back/refresh doesn't re-open
         }
     }, [location.state, openAdd, navigate]);
 
     const closeAdd = useCallback(() => {
         setAddOpen(false);
-        if (fromSettle) {
-            setFromSettle(false);
-            navigate("/reports/payables");
+        if (returnTo) {
+            setReturnTo(null);
+            navigate(returnTo);
         }
-    }, [fromSettle, navigate]);
+    }, [returnTo, navigate]);
 
     const amountC = toCentavos(parseFloat(amountStr) || 0);
 

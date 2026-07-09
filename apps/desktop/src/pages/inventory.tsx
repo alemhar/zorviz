@@ -22,10 +22,10 @@ import {
     deleteInventory,
     adjustStock,
     importInventory,
-    listSuppliers,
     type Part,
     type AdjustmentType,
 } from "../lib/inventory-api";
+import { listSupplierRecords } from "../lib/parties-api";
 import { parseCsv, pick } from "../lib/csv";
 import { ApiError } from "../lib/api";
 import { useAuthStore } from "../stores/auth";
@@ -378,7 +378,7 @@ function AdjustDialog({ item, currency, onClose, onSaved }: { item: Part; curren
 
     useEffect(() => {
         listLinkableExpenses().then(setLinkable).catch(() => {});
-        listSuppliers().then(setSupplierNames).catch(() => {});
+        listSupplierRecords().then((rows) => setSupplierNames(rows.map((s) => s.name))).catch(() => {});
     }, []);
 
     const n = parseFloat(qty) || 0;

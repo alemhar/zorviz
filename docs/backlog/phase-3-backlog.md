@@ -266,3 +266,38 @@ gate pass / release slip.
 - [ ] All render offline, download as PDF with the standard toast
 
 ---
+
+---
+
+## BACK-3-019 · Customer & Supplier Master Data (directory + profile pages) · *implemented, pending verification*
+
+**Priority:** 🔴 High (owner request 2026-07-09 — "fix the flow that just grew; do it the proper way")
+**Origin:** The payables/receivables work exposed that neither party had a home: customers only
+surfaced through jobs, suppliers were free text on receives, and money flows required detours.
+
+**Built (2026-07-09):**
+- **Suppliers table** (migration 0026) — real records; existing free-text names auto-promoted and
+  back-linked. Receive dialog still free-types the name (autocomplete) — an unknown name
+  find-or-creates the record server-side. Legacy `supplier` text kept in sync as display name.
+- **`/suppliers` + `/suppliers/:id`** — directory (contact, owed badge, last receive) + profile:
+  edit contact/notes, outstanding payables with per-row **Settle** (returns to the profile after
+  cancel/save via generalized `returnTo`), receive history with partial-payment states.
+- **`/customers` + `/customers/:id`** — searchable directory (balance badge, lifetime paid) +
+  profile: edit contact + staff **notes** (new column), assets (→ asset detail), job list with
+  status + per-job balance and **Collect** (→ ticket Billing card), SOA download.
+- Receivables report rows now drill into the customer profile; payables supplier group headers
+  drill into the supplier profile. Dashboard gains Customers (teal) + Suppliers (orange) tiles
+  (staff-only).
+- **Bug found & fixed:** sqlx SQLite `try_get::<String>` decodes NULL as `""` — supplier profile
+  misread every open payable as settled. Null checks now go through the null-safe JSON map.
+
+**Not in scope (later):** aging buckets (30/60/90), supplier credit terms/due dates, customer
+merge, suppliers/notes columns in cloud sync (protocol v1 is locked; cloud drops unknown columns
+safely — add on the next protocol rev).
+
+**Acceptance Criteria:**
+- [ ] Directory pages searchable, balances correct, mechanic role sees neither tile
+- [ ] Typed supplier name on a receive creates/reuses the record (case-insensitive)
+- [ ] Settle from supplier profile returns to the profile; payable states correct incl. partial
+- [ ] Collect from customer profile lands on the right ticket's Billing card
+- [ ] Customer notes persist and render on the profile

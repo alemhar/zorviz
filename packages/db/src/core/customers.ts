@@ -10,6 +10,7 @@ export interface CustomersTable {
     phone: Nullable<string>;
     email: Nullable<string>;
     address: Nullable<string>;
+    notes: Nullable<string>; // staff-facing institutional memory (migration 0026)
     created_at: number;
     updated_at: number;
 }
