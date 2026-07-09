@@ -63,7 +63,10 @@ export default function LoginPage() {
                         {config?.logo_path ? (
                             <img src={logoUrl(config.updated_at)} alt="Shop logo" className="h-16 max-w-[180px] object-contain" />
                         ) : (
-                            <img src="/wurkz-mark.png" alt="Wurkz" className="h-12 object-contain" />
+                            <div className="flex flex-col items-center gap-1">
+                                <img src="/wurkz-mark.png" alt="" className="h-12 object-contain" />
+                                <span className="text-sm font-extrabold tracking-wide text-foreground/80">Wurkz</span>
+                            </div>
                         )}
                     </div>
                     <CardTitle className="text-2xl text-center">{shopName || "Wurkz Shop"}</CardTitle>
