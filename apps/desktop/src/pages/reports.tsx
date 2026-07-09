@@ -5,7 +5,7 @@ import { REPORT_META, type ReportKey } from "./report-view";
 
 // BACK-3-018: Reports index — each card opens the on-screen preview page,
 // where the period is picked and the PDF is exported.
-const ORDER: ReportKey[] = ["pnl", "vat", "senior", "mechanics", "payables"];
+const ORDER: ReportKey[] = ["pnl", "vat", "senior", "mechanics", "payables", "receivables"];
 
 export default function ReportsPage() {
     const navigate = useNavigate();

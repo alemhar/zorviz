@@ -13,6 +13,7 @@ export interface InventoryAdjustmentsTable {
     expense_id: Nullable<string>; // BACK-3-016: linked parts expense (paid now or settled later)
     total_cost: Nullable<number>; // centavos paid/owed for this receive
     on_account: number; // 1 = supplier credit; outstanding payable while expense_id is NULL
+    supplier: Nullable<string>; // free-text supplier name (payables group by it)
     created_at: number;
 }
 

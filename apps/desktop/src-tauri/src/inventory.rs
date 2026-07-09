@@ -123,6 +123,7 @@ pub struct AdjustReq {
     on_account: Option<bool>,      // supplier credit — record the payable, no expense yet
     link_expense_id: Option<String>, // attach a previously-recorded parts expense instead
     update_unit_cost: Option<bool>, // refresh the item's unit_cost from total_cost/qty
+    supplier: Option<String>,       // who the stock came from (free text; payables group by it)
 }
 
 /// POST /api/inventory/:id/adjust — manual stock adjustment, applied atomically and
@@ -228,9 +229,14 @@ pub async fn adjust_inventory(
         expense_id = Some(eid);
     }
 
+    let supplier = if is_receive {
+        req.supplier.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+    } else {
+        None
+    };
     let _ = sqlx::query(
-        "INSERT INTO inventory_adjustments (id, item_id, type, delta, note, author, expense_id, total_cost, on_account, created_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO inventory_adjustments (id, item_id, type, delta, note, author, expense_id, total_cost, on_account, supplier, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(uuid::Uuid::new_v4().to_string())
     .bind(&id)
@@ -241,6 +247,7 @@ pub async fn adjust_inventory(
     .bind(&expense_id)
     .bind(total_cost)
     .bind(if on_account { 1_i64 } else { 0_i64 })
+    .bind(&supplier)
     .bind(now)
     .execute(&state.pool)
     .await;
@@ -272,14 +279,31 @@ pub async fn list_payables(
 ) -> Result<Json<Vec<Value>>, StatusCode> {
     require_staff(&state, &headers)?;
     let rows = sqlx::query(
-        "SELECT a.id, a.item_id, a.delta, a.total_cost, a.note, a.created_at, i.name AS item_name, i.sku \
+        "SELECT a.id, a.item_id, a.delta, a.total_cost, a.note, a.supplier, a.created_at, i.name AS item_name, i.sku \
          FROM inventory_adjustments a JOIN inventory i ON i.id = a.item_id \
-         WHERE a.on_account = 1 AND a.expense_id IS NULL ORDER BY a.created_at DESC LIMIT 100",
+         WHERE a.on_account = 1 AND a.expense_id IS NULL ORDER BY a.supplier, a.created_at DESC LIMIT 100",
     )
     .fetch_all(&state.pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(rows.iter().map(|r| Value::Object(row_to_json(r))).collect()))
+}
+
+/// GET /api/inventory/suppliers — distinct supplier names from past receives, for the
+/// receive dialog's autocomplete. Staff only.
+pub async fn list_suppliers(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<String>>, StatusCode> {
+    require_staff(&state, &headers)?;
+    let rows = sqlx::query(
+        "SELECT DISTINCT supplier FROM inventory_adjustments \
+         WHERE supplier IS NOT NULL AND supplier != '' ORDER BY supplier LIMIT 200",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(rows.iter().filter_map(|r| r.try_get::<String, _>("supplier").ok()).collect()))
 }
 
 /// GET /api/inventory/:id/adjustments — the item's adjustment log, newest first.

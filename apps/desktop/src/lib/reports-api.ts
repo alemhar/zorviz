@@ -79,3 +79,17 @@ export interface MechanicRow {
 export function mechanicReport(from: number, to: number): Promise<MechanicRow[]> {
     return api.get<MechanicRow[]>(`/api/reports/mechanics?from=${from}&to=${to}`);
 }
+
+export interface ReceivableRow {
+    customer_id: string;
+    name: string;
+    phone: string | null;
+    balance: number;
+    jobs: number; // open (partially/unpaid) done jobs
+    oldest_at: number; // oldest unpaid job's date
+}
+
+/** Customers with outstanding balances across done jobs (the collectibles list). */
+export function receivablesReport(): Promise<ReceivableRow[]> {
+    return api.get<ReceivableRow[]>("/api/reports/receivables");
+}

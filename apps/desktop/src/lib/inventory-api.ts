@@ -74,6 +74,7 @@ export interface AdjustInput {
     on_account?: boolean; // supplier credit -> payable, no expense yet
     link_expense_id?: string | null; // attach an already-recorded parts expense
     update_unit_cost?: boolean; // refresh the item's reference cost from this purchase
+    supplier?: string | null; // who the stock came from (payables group by it)
 }
 
 export interface Payable {
@@ -84,12 +85,18 @@ export interface Payable {
     delta: number;
     total_cost: number;
     note: string | null;
+    supplier: string | null;
     created_at: number;
 }
 
 // Outstanding on-account receives (owed to suppliers, not yet settled).
 export function listPayables(): Promise<Payable[]> {
     return api.get<Payable[]>("/api/inventory/payables");
+}
+
+// Distinct supplier names from past receives (autocomplete).
+export function listSuppliers(): Promise<string[]> {
+    return api.get<string[]>("/api/inventory/suppliers");
 }
 
 export function adjustStock(id: string, input: AdjustInput): Promise<Part> {

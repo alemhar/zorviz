@@ -237,6 +237,12 @@ reuses `listPayables`. All five E2E-verified via Playwright download capture —
 *2026-07-09 follow-up:* on-screen read-only HTML previews — report cards now navigate to `/reports/:key`
 pages (same endpoint payload as the PDF so numbers can't drift; period picker on the page; PDF is
 the export button). Payables page hides the period picker (as-of-now report).
+*2026-07-09 payables/receivables follow-up:* receives capture an optional free-text **supplier**
+(migration 0024, autocomplete from prior names); the payables page groups by supplier with
+subtotals and a per-row **Settle** button that opens the expense form pre-filled (recording the
+payment clears the payable — E2E-verified round trip). New **Receivables** report
+(`/api/reports/receivables` + page + PDF): customers with unpaid balances across done jobs,
+sorted largest first, per-row SOA download.
 
 **Tier 3 — later:** vehicle service-history printout, sales-by-period detail, stock-movement log,
 gate pass / release slip.

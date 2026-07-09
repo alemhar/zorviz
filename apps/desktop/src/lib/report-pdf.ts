@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import { formatMoney } from "@zorviz/core";
 import type { AppConfig } from "@zorviz/db";
 import { registerPdfFont, PDF_FONT_FAMILY } from "./pdf-font";
-import type { EodReport, SoaData, FinancialSummary, SeniorPwdRow, MechanicRow } from "./reports-api";
+import type { EodReport, SoaData, FinancialSummary, SeniorPwdRow, MechanicRow, ReceivableRow } from "./reports-api";
 import type { JobTicket, PaymentRecord } from "./orders-api";
 import type { Part, Payable } from "./inventory-api";
 
@@ -446,16 +446,16 @@ export function payablesPdf(items: Payable[], config: AppConfig | null, generate
         r.table(
             [
                 { label: "Date", x: LEFT },
-                { label: "Item received", x: 45 },
-                { label: "Qty", x: 122, align: "right" },
-                { label: "Note", x: 132 },
+                { label: "Supplier", x: 40 },
+                { label: "Item received", x: 78 },
+                { label: "Qty", x: 158, align: "right" },
                 { label: "Owed", x: RIGHT, align: "right" },
             ],
             items.map((p) => [
                 fmtD(p.created_at),
-                `${p.item_name} (${p.sku})`.slice(0, 34),
+                (p.supplier ?? "-").slice(0, 16),
+                `${p.item_name} (${p.sku})`.slice(0, 28),
                 String(p.delta),
-                (p.note ?? "").slice(0, 18),
                 formatMoney(p.total_cost, cur),
             ])
         );
@@ -466,4 +466,35 @@ export function payablesPdf(items: Payable[], config: AppConfig | null, generate
     r.note("Settle a payable by recording the paying parts expense (it links to the receive automatically).");
     r.footer(generatedBy);
     return r.save(`payables-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+/** 10. Receivables — customers with outstanding balances (the collectibles list). */
+export function receivablesPdf(rows: ReceivableRow[], config: AppConfig | null, generatedBy: string | null): string {
+    const cur = config?.currency_symbol ?? "";
+    const r = new ReportPdf();
+    r.header(config, "Receivables", `As of ${new Date().toLocaleDateString()}`);
+    if (rows.length) {
+        r.table(
+            [
+                { label: "Customer", x: LEFT },
+                { label: "Phone", x: 78 },
+                { label: "Open jobs", x: 128, align: "right" },
+                { label: "Oldest", x: 162, align: "right" },
+                { label: "Balance", x: RIGHT, align: "right" },
+            ],
+            rows.map((c) => [
+                c.name.slice(0, 28),
+                c.phone ?? "-",
+                String(c.jobs),
+                fmtD(c.oldest_at),
+                formatMoney(c.balance, cur),
+            ])
+        );
+        r.kv("TOTAL OUTSTANDING", formatMoney(rows.reduce((a, c) => a + c.balance, 0), cur), true);
+    } else {
+        r.note("No outstanding customer balances. All done jobs are fully paid.");
+    }
+    r.note("Per-customer detail (jobs and amounts) is the Statement of Account. Collect on the job ticket's Billing card.");
+    r.footer(generatedBy);
+    return r.save(`receivables-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

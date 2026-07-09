@@ -22,6 +22,7 @@ import {
     deleteInventory,
     adjustStock,
     importInventory,
+    listSuppliers,
     type Part,
     type AdjustmentType,
 } from "../lib/inventory-api";
@@ -369,12 +370,15 @@ function AdjustDialog({ item, currency, onClose, onSaved }: { item: Part; curren
     const [linkable, setLinkable] = useState<Expense[]>([]);
     const [linkId, setLinkId] = useState("");
     const [updateCost, setUpdateCost] = useState(true);
+    const [supplier, setSupplier] = useState("");
+    const [supplierNames, setSupplierNames] = useState<string[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const confirm = useConfirm();
 
     useEffect(() => {
         listLinkableExpenses().then(setLinkable).catch(() => {});
+        listSuppliers().then(setSupplierNames).catch(() => {});
     }, []);
 
     const n = parseFloat(qty) || 0;
@@ -408,6 +412,7 @@ function AdjustDialog({ item, currency, onClose, onSaved }: { item: Part; curren
                           on_account: payMode === "account",
                           link_expense_id: payMode === "link" && linkId ? linkId : null,
                           update_unit_cost: updateCost && costDiffers,
+                          supplier: supplier.trim() || null,
                       }
                     : {}),
             });
@@ -446,6 +451,13 @@ function AdjustDialog({ item, currency, onClose, onSaved }: { item: Part; curren
 
                     {kind === "receive" && (
                         <div className="space-y-3 rounded-lg border p-3">
+                            <div className="space-y-1">
+                                <Label htmlFor="adj-supplier">Supplier <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                                <Input id="adj-supplier" value={supplier} onChange={(e) => setSupplier(e.target.value)} list="supplier-names" placeholder="e.g. AutoParts PH" />
+                                <datalist id="supplier-names">
+                                    {supplierNames.map((s) => <option key={s} value={s} />)}
+                                </datalist>
+                            </div>
                             <div className="text-sm font-medium">What did you pay?</div>
                             <div className="grid grid-cols-3 gap-2 text-sm">
                                 {([["pay", "Record payment"], ["link", "Link expense"], ["account", "On account"]] as const).map(([k, label]) => (

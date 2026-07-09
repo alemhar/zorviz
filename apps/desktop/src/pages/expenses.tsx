@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
     Button,
     Input,
@@ -14,7 +14,7 @@ import {
     DialogFooter,
 } from "@zorviz/ui";
 import { ArrowLeft, Plus, Wallet } from "lucide-react";
-import { formatMoney, toCentavos } from "@zorviz/core";
+import { formatMoney, toCentavos, fromCentavos } from "@zorviz/core";
 import {
     listExpenses,
     createExpense,
@@ -55,16 +55,34 @@ export default function ExpensesPage() {
     }, []);
     useEffect(() => refresh(), [refresh]);
 
-    const openAdd = () => {
+    const openAdd = useCallback((presetSettleId?: string) => {
         setCategory("parts");
         setAmountStr("");
         setNote("");
         setFromDrawer(true);
-        setSettleId("");
+        setSettleId(presetSettleId ?? "");
         setError("");
         setAddOpen(true);
-        listPayables().then(setPayables).catch(() => {});
-    };
+        listPayables().then((pbs) => {
+            setPayables(pbs);
+            // Arriving via a payables-page Settle button: pre-fill the amount owed.
+            if (presetSettleId) {
+                const pb = pbs.find((x) => x.id === presetSettleId);
+                if (pb) setAmountStr(String(fromCentavos(pb.total_cost)));
+                else setSettleId("");
+            }
+        }).catch(() => {});
+    }, []);
+
+    // Settle handoff from the payables report page.
+    const location = useLocation();
+    useEffect(() => {
+        const settle = (location.state as { settlePayableId?: string } | null)?.settlePayableId;
+        if (settle) {
+            openAdd(settle);
+            navigate(".", { replace: true, state: null }); // consume so back/refresh doesn't re-open
+        }
+    }, [location.state, openAdd, navigate]);
 
     const amountC = toCentavos(parseFloat(amountStr) || 0);
 
@@ -111,7 +129,7 @@ export default function ExpensesPage() {
                 </button>
                 <Wallet className="w-5 h-5 text-primary" />
                 <h1 className="text-lg font-bold">Expenses</h1>
-                <Button size="sm" className="ml-auto" onClick={openAdd}>
+                <Button size="sm" className="ml-auto" onClick={() => openAdd()}>
                     <Plus className="w-4 h-4 mr-1" /> Add Expense
                 </Button>
             </header>
@@ -192,7 +210,7 @@ export default function ExpensesPage() {
                                     <option value="">{"\u2014 not settling a payable \u2014"}</option>
                                     {payables.map((pb) => (
                                         <option key={pb.id} value={pb.id}>
-                                            {pb.item_name} ({pb.sku}) {"\u00b7"} {formatMoney(pb.total_cost, currency)} owed {"\u00b7"} {new Date(pb.created_at).toLocaleDateString()}
+                                            {pb.supplier ? `${pb.supplier} \u00b7 ` : ""}{pb.item_name} ({pb.sku}) {"\u00b7"} {formatMoney(pb.total_cost, currency)} owed {"\u00b7"} {new Date(pb.created_at).toLocaleDateString()}
                                         </option>
                                     ))}
                                 </select>

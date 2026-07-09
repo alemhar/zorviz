@@ -490,6 +490,54 @@ pub async fn soa(
     })))
 }
 
+/// GET /api/reports/receivables — every customer with an outstanding balance across done
+/// jobs (the collectibles list; per-customer detail is the SOA). Staff only.
+pub async fn receivables(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<Value>>, (StatusCode, String)> {
+    require_staff(&state, &headers).map_err(|s| (s, "staff only".to_string()))?;
+    let rows = sqlx::query(
+        "SELECT o.customer_id, c.name, c.phone, o.total, o.created_at, \
+                COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.order_id = o.id), 0) AS paid \
+         FROM orders o JOIN customers c ON c.id = o.customer_id \
+         WHERE o.status = 'done' ORDER BY o.created_at",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
+
+    // Aggregate per customer, keeping only open balances and the oldest unpaid job's age.
+    let mut by_customer: std::collections::HashMap<String, (String, Option<String>, i64, i64, i64)> =
+        std::collections::HashMap::new();
+    for r in &rows {
+        let total: i64 = r.try_get("total").unwrap_or(0);
+        let paid: i64 = r.try_get("paid").unwrap_or(0);
+        if total - paid <= 0 {
+            continue;
+        }
+        let cid: String = r.try_get("customer_id").unwrap_or_default();
+        let name: String = r.try_get("name").unwrap_or_default();
+        let phone: Option<String> = r.try_get("phone").ok();
+        let created: i64 = r.try_get("created_at").unwrap_or(0);
+        let e = by_customer.entry(cid).or_insert((name, phone, 0, 0, i64::MAX));
+        e.2 += total - paid; // balance
+        e.3 += 1; // open jobs
+        e.4 = e.4.min(created); // oldest unpaid
+    }
+    let mut out: Vec<Value> = by_customer
+        .into_iter()
+        .map(|(cid, (name, phone, balance, jobs, oldest))| {
+            json!({
+                "customer_id": cid, "name": name, "phone": phone,
+                "balance": balance, "jobs": jobs, "oldest_at": oldest,
+            })
+        })
+        .collect();
+    out.sort_by_key(|v| -(v["balance"].as_i64().unwrap_or(0)));
+    Ok(Json(out))
+}
+
 #[derive(Deserialize)]
 pub struct RangeQuery {
     from: Option<i64>,
