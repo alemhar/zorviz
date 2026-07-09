@@ -36,6 +36,10 @@ The `RepairModule` is instantiated directly in `lib/db.ts`. As more modules are 
 
 ## BACK-1-005 · Hardware IO Foundation
 
+> **Depends on [BACK-3-018](./phase-3-backlog.md) — Printable Documents & Reports Suite (2026-07-09).**
+> That suite is the content foundation (PDF-first); this item then adds the transport half only:
+> thermal/ESC-POS re-rendering of the same documents + device discovery/printing (and scanner IO).
+
 **Priority:** Low  
 **Area:** `packages/core/` or new `packages/hardware/`  
 **Description:**  

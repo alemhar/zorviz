@@ -204,3 +204,51 @@ Close formula becomes: expected = float + cash payments − drawer expenses **+ 
 (session window). Safe-drop trail doubles as anti-theft visibility for the owner.
 
 ---
+
+## BACK-3-018 · Printable Documents & Reports Suite (PDF-first)
+
+**Priority:** 🔴 High (high-conversion feature set; **foundation/dependency of BACK-1-005 Hardware IO**)
+**Origin:** Owner request 2026-07-09 — catalog every printable document/report worth generating;
+PDF download first (the jsPDF + embedded-₱-font + saved-to-Downloads infra already exists), and
+the same renderers later re-target 58/80mm thermal width when BACK-1-005 adds device printing.
+
+**Already shipped (for reference):** Invoice/Job Order PDF, estimate-stage Job Order
+("FOR CUSTOMER APPROVAL"), Connect-QR PDF.
+
+**Tier 1 — the deliverable of this item (data fully captured today):**
+1. **End-of-Day (Z-reading) report** — per drawer session: float, cash sales, drawer expenses,
+   cash-ins/drops, expected vs counted, over/short, payments by method, jobs completed.
+   *Placement:* drawer card — offered right at Close Day (+ reprint from last closed session).
+2. **Payment receipt / acknowledgment** — per payment row (esp. partials: amount received,
+   method, balance remaining). *Placement:* Billing card, per payment-history line.
+3. **Statement of Account (SOA)** — per customer: unpaid balances across jobs (the utang
+   collector). *Placement:* customer/receivables context (decide exact entry point at build).
+4. **Reorder list** — low-stock items with suggested quantities + last cost (the supplier
+   shopping list). *Placement:* Inventory page, low-stock filter.
+
+**Tier 2 — follow-up items when Tier 1 lands:** P&L summary (period), Senior/PWD discount report
+(BIR compliance — OSCA IDs + amounts are captured), VAT summary (pro-rata breakdown), mechanic
+productivity (jobs + wrench time; commission/payroll input), payables report.
+
+**Tier 3 — later:** vehicle service-history printout, sales-by-period detail, stock-movement log,
+gate pass / release slip.
+
+**Build notes:**
+- Shared report-PDF helper (header w/ shop identity + logo, period line, table renderer, totals
+  row, generated-by/at footer) so each document is a thin layout on common infrastructure.
+- All documents follow D9: PDF download + saved-to-Downloads toast; no direct print dialog.
+- Local-first: reports render from local data on the desktop (work fully offline). Cloud-side
+  equivalents can come later for the owner's remote view.
+- **BACK-1-005 relationship:** this suite is the content foundation — the hardware item then only
+  adds transport (thermal/ESC-POS rendering + device discovery), not new documents.
+
+**Acceptance Criteria (Tier 1):**
+- [ ] Shared report-PDF infrastructure (shop header, period, tables, ₱ rendering)
+- [ ] EOD/Z report generable at close (and reprintable for the last session), numbers matching the
+      drawer session exactly
+- [ ] Per-payment receipt with balance remaining; partial-payment acknowledgment covered
+- [ ] Customer SOA listing open balances across jobs
+- [ ] Reorder list from the low-stock filter
+- [ ] All render offline, download as PDF with the standard toast
+
+---
