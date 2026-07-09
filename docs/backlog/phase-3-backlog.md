@@ -291,9 +291,12 @@ surfaced through jobs, suppliers were free text on receives, and money flows req
 - **Bug found & fixed:** sqlx SQLite `try_get::<String>` decodes NULL as `""` — supplier profile
   misread every open payable as settled. Null checks now go through the null-safe JSON map.
 
-**Not in scope (later):** aging buckets (30/60/90), supplier credit terms/due dates, customer
-merge, suppliers/notes columns in cloud sync (protocol v1 is locked; cloud drops unknown columns
-safely — add on the next protocol rev).
+**Not in scope (later):** supplier credit terms/due dates, customer
+merge. *2026-07-09 update:* cloud sync aligned via **protocol v1.1** (suppliers = 14th table,
+receive_id/supplier/notes columns; cloud payables switched to the running-balance formula).
+**Aging (30/60/90+) shipped CLOUD-ONLY by design** — per-customer receivables aging (from job
+completion) and per-supplier payables aging (from receive date) on the cloud shop dashboard;
+deliberately not duplicated on the desktop as a subscription differentiator (owner decision).
 
 **Acceptance Criteria:**
 - [ ] Directory pages searchable, balances correct, mechanic role sees neither tile
