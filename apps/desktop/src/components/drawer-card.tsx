@@ -10,7 +10,7 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@zorviz/ui";
-import { Banknote } from "lucide-react";
+import { Banknote, Info } from "lucide-react";
 import { formatMoney, toCentavos } from "@zorviz/core";
 import { drawerStatus, openDrawer, closeDrawer, drawerMovement, type DrawerSession, type DrawerMovement } from "../lib/financials-api";
 import { eodReport } from "../lib/reports-api";
@@ -37,6 +37,7 @@ export function DrawerCard() {
     const [amountStr, setAmountStr] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    const [helpOpen, setHelpOpen] = useState(false);
 
     const refresh = useCallback(() => {
         drawerStatus()
@@ -120,7 +121,25 @@ export function DrawerCard() {
         <div className="border rounded-xl p-6 bg-card max-w-sm">
             <h3 className="font-semibold mb-2 flex items-center gap-2">
                 <Banknote className="w-4 h-4 text-primary" /> Cash Drawer
+                <button
+                    onClick={() => setHelpOpen((v) => !v)}
+                    className="ml-auto p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                    aria-label="What do these buttons do?"
+                    aria-expanded={helpOpen}
+                    title="What do these buttons do?"
+                >
+                    <Info className="w-4 h-4" />
+                </button>
             </h3>
+            {helpOpen && (
+                <div className="mb-3 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground space-y-1.5">
+                    <p><span className="font-medium text-foreground">Open Day</span> — start tracking the till. Enter the cash already in the drawer (the float).</p>
+                    <p><span className="font-medium text-foreground">Cash In</span> — add cash mid-day that isn't a sale (e.g. extra change fund). Customer payments are recorded on the job ticket, not here.</p>
+                    <p><span className="font-medium text-foreground">Cash Drop</span> — take cash out mid-day to the safe or bank. Not an expense — just moving money.</p>
+                    <p><span className="font-medium text-foreground">Close Day</span> — count the drawer at closing; the app compares it to what should be there and shows over/short.</p>
+                    <p><span className="font-medium text-foreground">EOD Report</span> — PDF summary of the last closed day: sales, expenses, movements, over/short.</p>
+                </div>
+            )}
             {open ? (
                 <>
                     <p className="text-sm text-muted-foreground mb-1">
@@ -133,9 +152,9 @@ export function DrawerCard() {
                         </p>
                     )}
                     <div className="mt-2 flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => showDialog("cash_in")}>Cash In</Button>
-                        <Button variant="outline" size="sm" onClick={() => showDialog("cash_drop")}>Cash Drop</Button>
-                        <Button variant="outline" size="sm" onClick={() => showDialog("close")}>Close Day</Button>
+                        <Button variant="outline" size="sm" title="Add cash that isn't a sale (e.g. change fund)" onClick={() => showDialog("cash_in")}>Cash In</Button>
+                        <Button variant="outline" size="sm" title="Move cash out to the safe or bank (not an expense)" onClick={() => showDialog("cash_drop")}>Cash Drop</Button>
+                        <Button variant="outline" size="sm" title="Count the drawer and reconcile the day" onClick={() => showDialog("close")}>Close Day</Button>
                     </div>
                 </>
             ) : (
@@ -152,9 +171,9 @@ export function DrawerCard() {
                             : "Track the till: open the day with a float, close it with a count."}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => showDialog("open")}>Open Day</Button>
+                        <Button variant="outline" size="sm" title="Start the day: enter the cash already in the drawer (float)" onClick={() => showDialog("open")}>Open Day</Button>
                         {lastClosed && (
-                            <Button variant="outline" size="sm" onClick={() => void downloadEod()}>EOD Report</Button>
+                            <Button variant="outline" size="sm" title="Download the End-of-Day PDF for the last closed day" onClick={() => void downloadEod()}>EOD Report</Button>
                         )}
                     </div>
                 </>
