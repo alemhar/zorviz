@@ -265,10 +265,17 @@ re-push after recovery.
 ### 10.6 Subscription gate & retention
 
 - `snapshot` requires an **active subscription** on the tenant → otherwise `402`
-  with a human message ("Reactivate to recover — your data is safe").
+  with a human message ("Reactivate to recover — your data is safe"). The gate is deliberate:
+  it is the renewal trigger.
+- **Goodwill escape hatch (owner decision 2026-07-10):** for a LAPSED former cloud subscriber,
+  the platform admin may **manually pull/export the tenant's data** on request — a case-by-case
+  admin-side action within the retention window, not a product feature and not promised in
+  marketing. Only possible for tenants that actually subscribed (no subscription ever = no
+  cloud copy exists at all).
 - **Retention after lapse: 90 days** (default; platform-admin tunable per tenant). Within it,
-  reactivate-and-recover always works. After it, data is eligible for deletion per the
-  retention policy; deletion is manual in the manual-subscription era, never silent-automatic.
+  reactivate-and-recover always works (and the manual pull is possible). After it, data is
+  eligible for deletion per the retention policy; deletion is manual in the manual-subscription
+  era, never silent-automatic.
 - Stated openly in the product: this is the honest churn lever, not a surprise.
 
 ### 10.7 Versioning & errors
@@ -288,7 +295,9 @@ re-push after recovery.
 3. **Restore only into an empty install** ✅ — never a merge.
 4. **Credentials never travel** ✅ — owner login recreated in the wizard; staff PINs reassigned.
 5. **Watermark = `snapshot_at`** ✅ — push resumes incrementally after recovery.
-6. **Gate: active subscription; 90-day post-lapse retention (tunable), no silent deletion** ✅.
+6. **Gate: active subscription; 90-day post-lapse retention (tunable), no silent deletion** ✅;
+   lapsed ex-subscribers may get a manual admin-side data pull on request (goodwill, not a
+   product feature) ✅.
 
 ---
 
