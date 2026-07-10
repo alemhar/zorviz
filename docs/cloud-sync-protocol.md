@@ -192,33 +192,31 @@ Reserved for multi-device / portal write-back. Shape TBD when we build bidirecti
   all-or-nothing. (PITR reserved as a possible later premium tier.)
 - **NOT a migration/export API.** Same tables, same whitelists as push — nothing extra leaves.
 
-### 10.2 Recovery authentication
+### 10.2 Recovery authentication (revised 2026-07-10 — rides the existing connect flow)
 
-The old device token is presumed lost with the PC, so recovery has its own credential:
+No separate recovery credential. Recovery reuses the **device token** flow that already
+gates cloud connection: on disaster day the owner contacts the platform (same as onboarding —
+the human contact IS the identity check) and receives a fresh token.
 
-- **Recovery code**: issued per tenant from the platform-admin panel (fits the manual-
-  subscription workflow; a disaster is a phone call anyway). Owner-self-serve issuance from
-  Wurkz Cloud may be added later without a protocol change.
-- Format: 10 chars, Crockford base32 (no 0/O/1/I ambiguity), displayed grouped `XXXXX-XXXXX`.
-- Stored **hashed** cloud-side; **single-use**; **expires 24 h** after issuance; issuance and
-  claim are audit-logged; claim endpoint is rate-limited (5/min/IP).
-- **On successful claim, all prior device tokens for the tenant are revoked** — the stolen
-  PC's token dies the moment the shop recovers elsewhere.
+- **Admin panel gains "Issue replacement token"**: creates the new device token AND revokes
+  all prior tokens for the tenant in the same click — the lost/stolen PC's token dies the
+  moment the shop recovers elsewhere. (Normal "issue token" remains for adding devices;
+  replacement is the disaster-day button.)
+- Token issuance/revocation is audit-logged. Nothing else new to operate.
+- Owner-self-serve issuance from Wurkz Cloud may be added later without a protocol change.
 
 ### 10.3 Endpoints
 
-**`POST /recovery/claim`** (unauthenticated + rate-limited)
-```json
-{ "recovery_code": "XXXXXXXXXX" }
-```
-→ `200`:
-```json
-{ "protocol_version": 2, "tenant_id": "…", "shop_name": "…", "device_token": "…" }
-```
-The code is consumed atomically with token issuance. Errors: `404` unknown/used/expired code
-(deliberately indistinguishable), `402` subscription inactive (see 10.6), `429` rate limit.
+No claim endpoint — the wizard connects exactly like the Settings cloud-link flow (URL +
+device token, `GET /health` proves it), then:
 
-**`GET /sync/snapshot`** (Bearer device token — the newly claimed one or any valid one)
+**`GET /sync/tenant-info`** (Bearer device token)
+→ `200`: `{ "protocol_version": 2, "tenant_id": "…", "shop_name": "…", "has_data": true }`
+Lets the wizard show "Restore NP Car Aircon Repair?" before pulling, and lets a fresh tenant
+skip straight to normal setup. (The desktop needs `tenant_id` to write into `app_config` so
+future pushes continue the same cloud tenant.)
+
+**`GET /sync/snapshot`** (Bearer device token)
 → `200`:
 ```json
 {
@@ -235,13 +233,15 @@ The code is consumed atomically with token issuance. Errors: `404` unknown/used/
 
 ### 10.4 Desktop restore semantics
 
-1. Setup wizard offers **"Recover my shop from Wurkz Cloud"** beside fresh setup — available
-   ONLY while the local database is empty (setup not completed). **Never merges** into an
-   existing shop; a used database refuses recovery.
-2. Order of operations: run local migrations to latest → `claim` → `snapshot` → **write all
+1. Setup wizard offers **"I already use Wurkz — restore from the cloud"** beside fresh setup —
+   available ONLY while the local database is empty (setup not completed). **Never merges**
+   into an existing shop; a used database refuses recovery. (Free bonus scenario: planned PC
+   upgrades use the same path while the old PC still works.)
+2. Order of operations: run local migrations to latest → connect (URL + token, `/health`) →
+   `tenant-info` (confirm shop identity on screen) → `snapshot` → **write all
    rows in one transaction** (an interrupted restore rolls back to a clean, retryable slate)
-   → write `app_config` (original `tenant_id` from claim — REQUIRED so future pushes continue
-   the same cloud tenant; `cloud_url`, new `device_token`, `sync_enabled=1`,
+   → write `app_config` (original `tenant_id` from `tenant-info` — REQUIRED so future pushes
+   continue the same cloud tenant; `cloud_url`, `device_token`, `sync_enabled=1`,
    `last_synced_at = snapshot_at` so push resumes without a full resend) → apply
    `shop_settings` row into `app_config` fields.
 3. Deterministic insert order (parent-before-child):
@@ -264,7 +264,7 @@ re-push after recovery.
 
 ### 10.6 Subscription gate & retention
 
-- `claim` (and `snapshot`) require an **active subscription** on the tenant → otherwise `402`
+- `snapshot` requires an **active subscription** on the tenant → otherwise `402`
   with a human message ("Reactivate to recover — your data is safe").
 - **Retention after lapse: 90 days** (default; platform-admin tunable per tenant). Within it,
   reactivate-and-recover always works. After it, data is eligible for deletion per the
@@ -282,8 +282,9 @@ re-push after recovery.
 ## 11. v2 decisions (confirmed 2026-07-10)
 
 1. **Pull = one-shot recovery snapshot only** ✅ (no two-way sync, no PITR, no partial).
-2. **Recovery auth = admin-issued, hashed, single-use, 24 h code** ✅; claim revokes all prior
-   device tokens for the tenant.
+2. **Recovery auth rides the existing device-token connect flow** ✅ (owner decision
+   2026-07-10, replacing the earlier recovery-code design) — admin "Issue replacement token"
+   revokes all prior tokens; new `tenant-info` endpoint identifies the shop pre-restore.
 3. **Restore only into an empty install** ✅ — never a merge.
 4. **Credentials never travel** ✅ — owner login recreated in the wizard; staff PINs reassigned.
 5. **Watermark = `snapshot_at`** ✅ — push resumes incrementally after recovery.
