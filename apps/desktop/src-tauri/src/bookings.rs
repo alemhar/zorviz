@@ -120,3 +120,84 @@ async fn fetch_one(state: &ApiState, id: &str) -> Result<Json<Value>, (StatusCod
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "reload failed".to_string()))?;
     Ok(Json(Value::Object(row_to_json(&row))))
 }
+
+// ---- Online booking materialization (protocol v2.1, BACK-4-017 Part 1) ----
+
+#[derive(Deserialize)]
+pub struct OnlineBookingRequest {
+    id: String, // cloud booking_requests id (dedupe key)
+    customer_name: Option<String>,
+    customer_phone: Option<String>,
+    customer_email: Option<String>,
+    asset_description: Option<String>,
+    concern: Option<String>,
+    confirmed_time: i64,
+}
+
+#[derive(Deserialize)]
+pub struct MaterializeReq {
+    requests: Vec<OnlineBookingRequest>,
+}
+
+/// POST /api/sync/materialize-bookings — turn confirmed online booking requests (pulled from
+/// the cloud inbox by the sync client) into lightweight local bookings. Dedupe by request_id:
+/// re-delivery after a lost ACK is a no-op, honoring the delivered-exactly-once contract.
+/// Deliberately does NOT create customer rows — public-form input isn't master data; the
+/// customer record is created at drop-off like any walk-in. Staff only.
+pub async fn materialize_online_bookings(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+    Json(req): Json<MaterializeReq>,
+) -> Result<Json<Value>, (StatusCode, String)> {
+    require_staff(&state, &headers).map_err(|s| (s, "staff only".to_string()))?;
+    let mut created = 0u32;
+    let mut skipped = 0u32;
+    let clean = |o: &Option<String>| {
+        o.as_ref().map(|s| s.trim().chars().take(300).collect::<String>()).filter(|s| !s.is_empty())
+    };
+    for r in &req.requests {
+        let rid = r.id.trim();
+        if rid.is_empty() || r.confirmed_time <= 0 {
+            skipped += 1;
+            continue;
+        }
+        let exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM bookings WHERE request_id = ?")
+            .bind(rid)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "query failed".to_string()))?;
+        if exists > 0 {
+            skipped += 1;
+            continue;
+        }
+        // Note carries what the shop needs at the counter: what's coming in, the concern,
+        // and the email (only stored here — again, no master data from public input).
+        let note = [
+            clean(&r.asset_description),
+            clean(&r.concern),
+            clean(&r.customer_email).map(|e| format!("email: {e}")),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" · ");
+        let now = now_ms();
+        sqlx::query(
+            "INSERT INTO bookings (id, customer_name, customer_phone, note, scheduled_time, status, request_id, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)",
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(clean(&r.customer_name))
+        .bind(clean(&r.customer_phone))
+        .bind(if note.is_empty() { None } else { Some(note) })
+        .bind(r.confirmed_time)
+        .bind(rid)
+        .bind(now)
+        .bind(now)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "insert failed".to_string()))?;
+        created += 1;
+    }
+    Ok(Json(serde_json::json!({ "created": created, "skipped": skipped })))
+}

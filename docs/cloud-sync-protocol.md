@@ -350,9 +350,12 @@ nullable `request_id` column — also added to the push whitelist so the cloud c
 
 ### 12.3 Client behavior (desktop)
 
-- Piggybacks on the existing 60s connected cycle: `booking-inbox` → create local bookings
-  (find-or-create customer by exact mobile match; asset left unassigned — the shop attaches it
-  at drop-off) → `booking-ack`. Offline shops simply drain the queue on reconnect.
+- Piggybacks on the existing 60s connected cycle: `booking-inbox` → create local bookings →
+  `booking-ack`. Offline shops simply drain the queue on reconnect.
+- **Amended 2026-07-10 (implementation):** materialization creates a LIGHTWEIGHT booking
+  (customer_name/phone, note = asset · concern · email) and does NOT create a customers row —
+  public-form input is not master data; the customer record is created at drop-off/convert,
+  which the bookings flow already supports.
 - UI: booking appears in the Bookings page flagged "online booking"; arrival toast.
 
 ### 12.4 Decisions (confirmed 2026-07-10)

@@ -370,9 +370,15 @@ degrade to email-only with a notice to the owner (never silent). Per-tenant mont
 resets on billing cycle.
 
 **Build split (owner structure 2026-07-10):**
-- **Part 1 — desktop:** (a) migration: `bookings.request_id` (nullable; dedupe + push-whitelist
-  join column); (b) booking-inbox pull + ACK piggybacked on the existing 60s sync cycle;
-  (c) Bookings page "online booking" badge + arrival toast. **Silent-drop rule:** the inbox
+- **Part 1 — desktop:** *implemented 2026-07-10, verified against a mock cloud (E2E: drain →
+  2 bookings materialized w/ badge; lost-ACK redelivery deduped to 0; ACK recorded; inbox
+  emptied).* (a) migration 0027 `bookings.request_id`; (b) inbox drain + ACK in runSync
+  (fires every cycle, all failure modes silent); (c) Bookings page badge + arrival toast.
+  **Spec change during implementation:** materialization creates a LIGHTWEIGHT booking
+  (customer_name/phone + note carrying asset · concern · email) and deliberately does NOT
+  find-or-create a customer row — public-form input must not become master data (spam would
+  pollute the directory); the customer record is created at drop-off like any walk-in.
+  Protocol §12.3 amended to match. **Silent-drop rule:** the inbox
   fetch no-ops without noise when sync is disabled, the cloud is unreachable, the endpoint
   doesn't exist yet (older cloud → 404), or the subscription is inactive (402/403) — same
   fail-safe posture as the sync manager: local operation is never affected, nothing is logged

@@ -12,6 +12,7 @@ export interface Booking {
     status: BookingStatus;
     asset_id: string | null;
     customer_id: string | null;
+    request_id: string | null; // set when the booking arrived from Wurkz Cloud online booking
     created_at: number;
     updated_at: number;
 }

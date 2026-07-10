@@ -12,6 +12,7 @@ export interface BookingsTable {
     status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
     asset_id: Nullable<string>;
     customer_id: Nullable<string>; // references customers(id)
+    request_id: Nullable<string>; // cloud booking_requests id (online booking dedupe/link, v2.1)
     created_at: number;
     updated_at: number;
 }

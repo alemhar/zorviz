@@ -143,7 +143,14 @@ export default function BookingsPage() {
                         <CardContent className="p-4 space-y-2">
                             <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
-                                    <div className="font-medium truncate">{b.customer_name || "(no name)"}</div>
+                                    <div className="font-medium truncate flex items-center gap-1.5">
+                                        {b.customer_name || "(no name)"}
+                                        {b.request_id && (
+                                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400 shrink-0">
+                                                online booking
+                                            </span>
+                                        )}
+                                    </div>
                                     {b.customer_phone && (
                                         <div className="text-xs text-muted-foreground flex items-center gap-1">
                                             <Phone className="w-3 h-3" /> {b.customer_phone}

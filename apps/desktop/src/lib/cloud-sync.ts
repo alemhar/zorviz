@@ -1,6 +1,7 @@
 import { api } from "./api";
 import { useCloudSyncStore } from "../stores/cloud-sync";
 import { useAppConfigStore } from "../stores/app-config";
+import { toast } from "../stores/toast";
 
 const PUSH_TIMEOUT = 15_000;
 
@@ -25,6 +26,11 @@ export async function runSync(): Promise<{ ok: boolean; pushed: number; error?: 
     }
 
     const since = config.last_synced_at ?? 0;
+
+    // Booking inbox (protocol v2.1, BACK-4-017 Part 1): drain confirmed online bookings.
+    // Runs every cycle regardless of push outcome; ALWAYS fails silent — an older cloud
+    // (404), inactive subscription (402/403), or network blip must never affect anything.
+    void drainBookingInbox(base, token);
 
     // 1. Collect the local change batch (never leaves the device on failure).
     let batch: ChangeBatch;
@@ -72,5 +78,60 @@ export async function runSync(): Promise<{ ok: boolean; pushed: number; error?: 
         return { ok: false, pushed: 0, error: "network" };
     } finally {
         clearTimeout(to);
+    }
+}
+
+interface InboxRequest {
+    id: string;
+    customer_name: string | null;
+    customer_phone: string | null;
+    customer_email: string | null;
+    asset_description: string | null;
+    concern: string | null;
+    confirmed_time: number;
+}
+
+// Delivered-exactly-once: materialize locally FIRST (dedupes by request_id), then ACK.
+// A lost ACK just means the same requests come back next cycle and dedupe to no-ops.
+async function drainBookingInbox(base: string, token: string): Promise<void> {
+    try {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), PUSH_TIMEOUT);
+        const res = await fetch(`${base}/sync/booking-inbox`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: ctrl.signal,
+        });
+        clearTimeout(to);
+        if (!res.ok) return; // 404 old cloud, 402 unsubscribed, anything — silent
+        const body = (await res.json().catch(() => null)) as { requests?: InboxRequest[] } | null;
+        const requests = body?.requests ?? [];
+        if (!requests.length) return;
+
+        const result = await api.post<{ created: number; skipped: number }>(
+            "/api/sync/materialize-bookings",
+            { requests }
+        );
+
+        // ACK everything delivered (created or deduped) — best-effort.
+        const ackCtrl = new AbortController();
+        const ackTo = setTimeout(() => ackCtrl.abort(), PUSH_TIMEOUT);
+        await fetch(`${base}/sync/booking-ack`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ids: requests.map((r) => r.id) }),
+            signal: ackCtrl.signal,
+        }).catch(() => {});
+        clearTimeout(ackTo);
+
+        if (result.created > 0) {
+            toast(
+                result.created === 1
+                    ? "New online booking received"
+                    : `${result.created} new online bookings received`,
+                "success"
+            );
+        }
+    } catch {
+        // silent by design — local operation is never affected by the inbox
     }
 }

@@ -126,6 +126,7 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
             get(bookings::list_bookings).post(bookings::create_booking),
         )
         .route("/api/bookings/:id/status", post(bookings::set_booking_status))
+        .route("/api/sync/materialize-bookings", post(bookings::materialize_online_bookings))
         .route(
             "/api/logo",
             get(media::get_logo).post(media::upload_logo).delete(media::delete_logo),
