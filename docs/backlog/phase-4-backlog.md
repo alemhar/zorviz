@@ -323,12 +323,18 @@ snapshots (cloud holds latest state only in v1; PITR could be a later premium ti
 1. **Public booking page** per shop: `cloud/book/{shop-code}` — no customer account needed.
    Fields: name, mobile, email (optional), what to bring in (asset description), concern,
    preferred date + time slot. Anti-spam: honeypot + rate limit per IP + per-phone dedupe.
-   **Slot model (decided 2026-07-10 — shop-hours grid + real occupancy):** the shop sets open
-   days/hours/slot length once in Wurkz Cloud settings; the grid greys out slots colliding with
-   a synced desktop booking (bookings already push up) or an already-CONFIRMED online request.
-   Pending requests do NOT block a slot — the owner resolves collisions at confirm (adjusting
+   **Slot model (decided 2026-07-10 — shop-hours grid + real occupancy + capacity):** the shop
+   sets open days/hours/slot length AND **capacity per slot** (e.g. 4 cars per hour) once in
+   Wurkz Cloud settings; a slot greys out only when (synced desktop bookings + CONFIRMED online
+   requests) occupying it reach capacity — remaining seats shown ("2 slots left"). Pending
+   requests do NOT consume capacity — the owner resolves oversubscription at confirm (adjusting
    the time is built in). Page states "subject to confirmation"; an offline shop's stale grid
    is exactly what the confirm-first rule exists to catch.
+   **Page identity (decided 2026-07-10 — slug + QR):** the shop picks a readable slug
+   (`/book/np-aircon-davao`, uniqueness enforced) in Cloud settings, and Wurkz Cloud generates
+   a printable QR poster ("Book online — scan here") pointing at it — tarpaulin/counter/FB
+   distribution. Page shows shop name, address, phone, hours + the grid; v1 is text-branded
+   (cloud-side shop logo upload is a later nicety — the desktop logo file doesn't sync).
 2. Request lands **cloud-side** as `booking_requests` (status `pending`) — deliberately NOT the
    synced `bookings` table: `bookings` stays desktop-owned; `booking_requests` is a cloud-owned
    queue (one-writer-per-table principle, no conflicts).
