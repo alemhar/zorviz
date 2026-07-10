@@ -136,11 +136,12 @@ Reserved for multi-device / portal write-back. Shape TBD when we build bidirecti
     (`device_token`, `cloud_url`) and local-only fields never leave the shop.** Gives the cloud
     correct money formatting and policy context (e.g. discount-cap breach detection). Clouds on
     v1.1 ignore the unknown table (additive-safe).
-    Also new: **`staff_directory`** — curated projection of `users` (`id`, `name`, `role`,
-    `is_active`, `updated_at`; `updated_at` marker) so per-staff analytics (mechanic comeback
-    rate, drawer-closer variance) can show names instead of UUIDs. **Credentials never sync:**
-    no `pin_hash`/`pin_salt`, and `username` (a login identifier) stays local. The `users` table
-    itself remains excluded from sync.
+    Also new: **`staff_directory`** — curated projection of `users` (`id`, `name`, `username`,
+    `role`, `is_active`, `email`, `updated_at`; `updated_at` marker) so per-staff analytics can
+    show names, and so recovery (§10) restores complete accounts. **Secrets never sync:** no
+    `pin_hash`/`pin_salt` in either direction. (2026-07-10: owner widened the projection to
+    include `username`/`email` for restore completeness — originally username was held local.)
+    The `users` table itself remains excluded from sync.
     **Deployment note (both v1.2 payloads):** a device that pushed past its watermark before the
     cloud accepts these tables won't resend them until the row changes — after deploying the
     cloud side, either bump each shop's settings/users once or reset the device watermark to 0
@@ -248,11 +249,13 @@ future pushes continue the same cloud tenant.)
    `customers → asset_types → assets → bookings → orders → order_items →
    order_status_history → payments → suppliers → inventory → inventory_adjustments →
    expenses → drawer_sessions → drawer_movements`.
-4. **Staff re-entry:** `staff_directory` rows recreate local users (id, name, role, is_active)
-   with **no credentials** — pin hashes never sync in either direction. The wizard's final step
-   creates the owner's login fresh (username + PIN) bound to the restored owner-role row;
-   remaining staff are restored in a "PIN not set" state and the owner assigns PINs from the
-   existing Staff page. Usernames are re-entered (they never sync).
+4. **Staff re-entry (revised 2026-07-10):** `staff_directory` rows recreate local users
+   COMPLETE — id, name, username, role, is_active, email — with **no PINs** (hashes never sync
+   in either direction). The wizard's final step: "pick your account, set a new PIN" — listing
+   the restored admin/owner-role accounts (the verified replacement token entitles the holder).
+   That person then resets the other staff PINs from the existing Staff page. No accounts are
+   created on restore — only re-keyed. (Context: fresh installation creates exactly ONE account,
+   role 'admin' — there is no separate owner account at install.)
 5. **Honesty screen:** before finishing, the wizard lists what did NOT come back — shop logo
    file, license activation, device/QR pairings, staff usernames/PINs — with one-line fixes.
 
@@ -296,7 +299,8 @@ re-push after recovery.
    2026-07-10, replacing the earlier recovery-code design) — admin "Issue replacement token"
    revokes all prior tokens; new `tenant-info` endpoint identifies the shop pre-restore.
 3. **Restore only into an empty install** ✅ — never a merge.
-4. **Credentials never travel** ✅ — owner login recreated in the wizard; staff PINs reassigned.
+4. **PINs never travel; user details do** ✅ (revised 2026-07-10) — accounts restore complete
+   incl. usernames; the wizard re-keys the recovering admin/owner, who re-keys the rest.
 5. **Watermark = `snapshot_at`** ✅ — push resumes incrementally after recovery.
 6. **Gate: active subscription; 90-day post-lapse retention (tunable), no silent deletion** ✅;
    lapsed ex-subscribers may get a manual admin-side data pull on request (goodwill, not a

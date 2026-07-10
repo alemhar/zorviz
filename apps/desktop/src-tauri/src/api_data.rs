@@ -1906,11 +1906,11 @@ pub async fn sync_changes(
         tables.insert("shop_settings".to_string(), Value::Array(arr));
     }
 
-    // Protocol v1.2 (BACK-4-009): staff directory — id→name/role so cloud analytics can label
-    // per-staff figures (assigned_mechanic_id etc. are user UUIDs; the users table itself stays
-    // local). Curated columns only: NEVER pin_hash/pin_salt, and username stays local too.
+    // Protocol v1.2 (BACK-4-009, widened 2026-07-10 for v2 restore): staff directory —
+    // complete account details EXCEPT credentials, so analytics get names and recovery (§10)
+    // restores accounts whole. NEVER pin_hash/pin_salt.
     if let Ok(rows) = sqlx::query(
-        "SELECT id, name, role, is_active, updated_at FROM users WHERE updated_at > ?",
+        "SELECT id, name, username, role, is_active, email, updated_at FROM users WHERE updated_at > ?",
     )
     .bind(since)
     .fetch_all(&state.pool)
