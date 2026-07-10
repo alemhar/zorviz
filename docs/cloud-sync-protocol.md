@@ -272,10 +272,13 @@ re-push after recovery.
   admin-side action within the retention window, not a product feature and not promised in
   marketing. Only possible for tenants that actually subscribed (no subscription ever = no
   cloud copy exists at all).
-- **Retention after lapse: 90 days** (default; platform-admin tunable per tenant). Within it,
-  reactivate-and-recover always works (and the manual pull is possible). After it, data is
-  eligible for deletion per the retention policy; deletion is manual in the manual-subscription
-  era, never silent-automatic.
+- **Retention after lapse: 90 days** (CONFIRMED 2026-07-10; platform-admin tunable per
+  tenant). Within it, reactivate-and-recover always works (and the manual pull is possible).
+  After it, data is eligible for deletion per the retention policy; deletion is manual in the
+  manual-subscription era, never silent-automatic.
+- **Pre-deletion warning:** as the window closes, the lapsed tenant gets one notice (email +
+  SMS if a number is on file): "Your Wurkz Cloud backup will be deleted on [date]. Reactivate
+  to keep it." Fairness + documented notice + the highest-value renewal prompt we send.
 - Stated openly in the product: this is the honest churn lever, not a surprise.
 
 ### 10.7 Versioning & errors
