@@ -257,7 +257,8 @@ future pushes continue the same cloud tenant.)
    created on restore — only re-keyed. (Context: fresh installation creates exactly ONE account,
    role 'admin' — there is no separate owner account at install.)
 5. **Honesty screen:** before finishing, the wizard lists what did NOT come back — shop logo
-   file, license activation, device/QR pairings, staff PINs — with one-line fixes.
+   file, license activation, device/QR pairings, staff PINs, **job photos** (media never syncs
+   in v1 — added to the list during Part 1 implementation) — with one-line fixes.
 6. **License (decided 2026-07-10, as-is):** license state is machine-local and does not
    restore; the recovered shop runs in trial mode (nothing blocked) and the license is
    re-issued via platform contact — operationally the same call as the replacement token.

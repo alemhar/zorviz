@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input, Label, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@zorviz/ui";
-import { Store, ListPlus, Coins, UserCog, Plus, Trash2, Shapes } from "lucide-react";
+import { Store, ListPlus, Coins, UserCog, Plus, Trash2, Shapes, CloudDownload } from "lucide-react";
+import { RestoreWizard } from "../components/restore-wizard";
 import { api } from "../lib/api";
 import { useAppConfigStore } from "../stores/app-config";
 import { getAssetTypeTemplates, type AssetTypeTemplate } from "../lib/asset-types-api";
@@ -18,6 +19,7 @@ const STEPS = [
 ];
 
 export default function SetupPage() {
+    const [mode, setMode] = useState<"choose" | "new" | "restore">("choose");
     const navigate = useNavigate();
     const fetchConfig = useAppConfigStore((s) => s.fetchConfig);
 
@@ -129,6 +131,53 @@ export default function SetupPage() {
     };
 
     const StepIcon = STEPS[step].icon;
+
+    // BACK-4-016 Part 1: fresh install chooses between a new shop and a cloud restore.
+    if (mode === "choose") {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
+                <Card className="w-full max-w-lg">
+                    <CardHeader>
+                        <div className="flex justify-center mb-2">
+                            <img src="/wurkz-mark.png" alt="" className="h-10 object-contain" />
+                        </div>
+                        <CardTitle className="text-2xl text-center">Welcome to Wurkz Shop</CardTitle>
+                        <CardDescription className="text-center">How do you want to start?</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <button
+                            onClick={() => setMode("new")}
+                            className="w-full flex items-center gap-3 rounded-xl border p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                        >
+                            <div className="p-2.5 rounded-lg bg-primary/10"><Store className="w-6 h-6 text-primary" /></div>
+                            <div>
+                                <div className="font-semibold">Set up a new shop</div>
+                                <div className="text-sm text-muted-foreground">First time here — start fresh.</div>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setMode("restore")}
+                            className="w-full flex items-center gap-3 rounded-xl border p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                        >
+                            <div className="p-2.5 rounded-lg bg-primary/10"><CloudDownload className="w-6 h-6 text-primary" /></div>
+                            <div>
+                                <div className="font-semibold">I already use Wurkz — restore from the cloud</div>
+                                <div className="text-sm text-muted-foreground">New PC, same shop. Needs your device token.</div>
+                            </div>
+                        </button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (mode === "restore") {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
+                <RestoreWizard onBack={() => setMode("choose")} />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">

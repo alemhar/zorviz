@@ -24,6 +24,7 @@ use crate::financials;
 use crate::inventory;
 use crate::suppliers;
 use crate::media;
+use crate::restore;
 use crate::auth::{self, ApiState, AuthState};
 
 const PORT: u16 = 3030;
@@ -111,6 +112,8 @@ pub async fn start_server(app: AppHandle, pool: Pool<Sqlite>) {
             get(api_data::get_config).put(api_data::update_config),
         )
         .route("/api/setup", post(api_data::setup))
+        .route("/api/setup/restore", post(restore::restore_from_snapshot))
+        .route("/api/setup/restore-claim", post(restore::restore_claim))
         .route("/api/stats", get(api_data::get_stats))
         .route("/api/asset-type-templates", get(asset_types::get_templates))
         .route(

@@ -15,6 +15,7 @@ pub mod financials;
 pub mod inventory;
 pub mod license;
 pub mod media;
+pub mod restore;
 pub mod server;
 pub mod suppliers;
 

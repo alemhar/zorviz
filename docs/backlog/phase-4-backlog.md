@@ -295,9 +295,15 @@ owed."* Free tier line: "Diskette-style backups are free forever. Never-lose-you
    tables; then the marketing screenshot is the drill's result.
 
 **Build split (owner structure 2026-07-10):**
-- **Part 1 — desktop:** the setup-wizard "I already use Wurkz — restore from the cloud" path
+- **Part 1 — desktop:** *implemented 2026-07-10 and verified by a full disaster drill against
+  a mock cloud serving a real captured snapshot: DB moved away → fresh boot → wizard restore →
+  79 records back, ALL table counts matching, tenant preserved, sync re-armed
+  (watermark = snapshot_at), signed in with the re-keyed owner PIN, Juan's ₱1,251.20 balance
+  intact.* The setup-wizard "I already use Wurkz — restore from the cloud" path
   (connect → tenant-info → confirm shop → snapshot → transactional write → pick-your-account
-  PIN re-key → honesty screen). **Graceful-degradation rule:** the option lives only in the
+  PIN re-key → honesty screen). Implementation notes: restore-claim endpoint is self-sealing
+  (usable only while no admin/owner has a PIN); fixed per-table column whitelists in restore.rs
+  defend the SQL; honesty screen gained "job photos" (media never syncs in v1). **Graceful-degradation rule:** the option lives only in the
   wizard; unreachable cloud / bad token / 402 inactive → clear human message and a clean
   return to fresh-setup, local DB untouched. No background behavior at all; a never-cloud
   shop never sees a difference. (staff_directory widening already shipped 2026-07-10.)
