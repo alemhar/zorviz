@@ -253,3 +253,56 @@ Monthly VAT summary + Senior/PWD record rendered cloud-side, permanent archive, 
 **Priority:** 🟡 Medium (retention feature — the cloud comes to the owner)
 Weekly email: drawer shorts, cap breaches/big discounts, expense spikes vs prior month, dead-stock
 delta, receivables aging movement. Needs a scheduler (Hostinger cron) + mail config.
+
+---
+
+## BACK-4-016 · Cloud Restore — disaster recovery (premium flagship)
+
+**Priority:** 🔴 High (owner decision 2026-07-10 — the premium feature that completes the
+"never lose your shop" promise; strongest churn-stopper in the subscription)
+**Principle:** ADDS to the desktop, takes nothing away. Local/USB Backup & Restore stays free
+and unchanged. The premium is the offsite, automatic, zero-discipline recovery path — the sync
+that already runs IS the backup; this builds the missing pull direction.
+
+**The pitch:** *"Your shop PC died? Flooded? Stolen? Buy any new computer, install Wurkz Shop,
+enter your code — and your entire shop walks back in: every customer, every job, every peso
+owed."* Free tier line: "Diskette-style backups are free forever. Never-lose-your-shop is
+₱X a month."
+
+**Scope:**
+1. **Protocol v2 rev (pull):** v1 is deliberately push-only (§8 reserved this). Spec first,
+   lock before building — mirrors the v1 discipline. Core: `GET /sync/snapshot` returns the
+   tenant's full table set (same 14+ tables, same column whitelists, tenant from the device
+   token, never the payload). One-shot full snapshot only — NO continuous two-way sync (that's
+   a different, conflict-laden problem we are deliberately not solving here).
+2. **Recovery authentication:** recovering onto a NEW machine means the old device token may be
+   lost with the PC. Decide the mechanism: platform admin issues a one-time recovery code from
+   the admin panel (fits the manual-subscription workflow), or owner self-serve from Wurkz Cloud
+   login. Lean: admin-issued recovery code for v1 — it's a phone call during a disaster anyway.
+3. **Desktop setup wizard:** "Recover my shop from Wurkz Cloud" path beside fresh setup —
+   enter cloud URL + recovery code → pull snapshot → write local DB (inside a transaction;
+   an interrupted restore must leave a clean slate, not a half-shop) → normal login with the
+   restored users' PINs.
+4. **What restores / what doesn't:** all synced business data + shop_settings + staff_directory
+   (names/roles — PINs DO restore? No: pin_hash never syncs by design). Decide the staff
+   re-entry story: v1 = restore creates the staff accounts with a forced PIN reset by the owner
+   (owner sets temp PINs post-restore). Local-only things that can't restore: logo file,
+   license state, device pairing — wizard must say so honestly.
+5. **Gating:** restore endpoint checks the tenant's subscription status (manual subscriptions
+   already exist). Expired subscription → data is retained (grace policy: decide retention
+   window) but restore requires reactivation — this is the honest churn lever, stated up front.
+6. **Verification:** E2E drill — seed shop, sync, wipe local DB, recover, byte-compare business
+   tables; then the marketing screenshot is the drill's result.
+
+**Explicitly out of scope:** two-way/multi-device sync, partial restores, point-in-time
+snapshots (cloud holds latest state only in v1; PITR could be a later premium tier).
+
+**Depends on:** nothing new — data already lands cloud-side via v1.1/v1.2 push.
+
+**Acceptance Criteria:**
+- [ ] Protocol v2 pull spec written and LOCKED before implementation (like v1)
+- [ ] Full-cycle drill passes: wipe → recover → business tables match the cloud copy
+- [ ] Interrupted restore leaves a clean, retryable state (transactional)
+- [ ] Staff accounts restore with owner-controlled PIN reset; pin hashes never leave/return
+- [ ] Wizard honestly lists what does not come back (logo, license, device pairing)
+- [ ] Subscription gate + retention/grace policy decided and enforced
