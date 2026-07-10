@@ -301,6 +301,11 @@ snapshots (cloud holds latest state only in v1; PITR could be a later premium ti
 
 **Acceptance Criteria:**
 - [x] Protocol v2 pull spec written and LOCKED before implementation — `cloud-sync-protocol.md` §10–11 (2026-07-10)
+- [x] Spec iterated & FINALIZED with the owner (2026-07-10): recovery rides the device-token
+      connect flow (replacement token revokes old ones); hard subscription gate + manual
+      goodwill pull for lapsed ex-subscribers; 90-day retention + pre-deletion warning;
+      staff_directory widened (username/email, no PINs) so restore re-keys instead of
+      recreating; license stays machine-local (trial covers the gap, re-issued on contact)
 - [ ] Full-cycle drill passes: wipe → recover → business tables match the cloud copy
 - [ ] Interrupted restore leaves a clean, retryable state (transactional)
 - [ ] Staff accounts restore with owner-controlled PIN reset; pin hashes never leave/return
